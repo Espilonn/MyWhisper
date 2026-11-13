@@ -1,0 +1,16 @@
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+.externalNativeBuild/
+.cxx/
+models/*.bin
+models/*.gguf
+captures/
+
+third_party/
+.gradle/
+build/
+app/build/
+local.properties
