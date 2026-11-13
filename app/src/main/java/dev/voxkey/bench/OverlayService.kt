@@ -1,7 +1,5 @@
 package dev.voxkey.bench
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,9 +7,12 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -20,7 +21,6 @@ import android.os.SystemClock
 import android.util.Log
 import android.provider.Settings
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -57,20 +57,27 @@ class OverlayService : Service() {
             private set
 
         private var focusListener: ((Boolean) -> Unit)? = null
+        private var keyboardListener: ((Rect?) -> Unit)? = null
 
         fun notifyFocus(has: Boolean) {
             focusListener?.invoke(has)
+        }
+
+        /** Rectangle du clavier (coordonnées écran) fourni par le service d'accessibilité. */
+        fun notifyKeyboard(bounds: Rect?) {
+            keyboardListener?.invoke(bounds)
         }
     }
 
     private lateinit var wm: WindowManager
     private lateinit var root: LinearLayout
-    private lateinit var bubble: FrameLayout
-    private lateinit var bubbleLabel: TextView
+    private lateinit var key: FrameLayout
+    private lateinit var keyView: WaveBarsView
     private lateinit var panel: TextView
     private lateinit var params: WindowManager.LayoutParams
 
-    private var pulse: ObjectAnimator? = null
+    /** Zone du clavier à l'écran ; null tant qu'aucun clavier n'est visible. */
+    private var keyboard: Rect? = null
     private val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
@@ -104,17 +111,24 @@ class OverlayService : Service() {
                 if (recording) return@post
                 if (has) {
                     root.visibility = View.VISIBLE
-                    moveAboveKeyboard()
+                    moveToKeyboard()
                 } else {
                     root.visibility = View.GONE
                 }
+            }
+        }
+        keyboardListener = { bounds ->
+            main.post {
+                keyboard = bounds
+                Log.d("VXK", "keyboard=$bounds")
+                if (root.visibility == View.VISIBLE) moveToKeyboard()
             }
         }
         Log.d("VXK", "overlay created, a11y=${VoxkeyAccessibilityService.instance != null} text=${VoxkeyAccessibilityService.hasTextField}")
         if (VoxkeyAccessibilityService.instance != null) {
             val has = VoxkeyAccessibilityService.hasTextField
             root.visibility = if (has) View.VISIBLE else View.GONE
-            if (has) moveAboveKeyboard()
+            if (has) moveToKeyboard()
         }
     }
 
@@ -122,9 +136,10 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         focusListener = null
+        keyboardListener = null
         running = false
         recording = false
-        pulse?.cancel()
+        keyView.active = false
         try {
             wm.removeView(root)
         } catch (_: Exception) {
@@ -145,38 +160,41 @@ class OverlayService : Service() {
             gravity = Gravity.START
         }
 
+        // Panneau de statut : chip compact, même matière que le clavier.
         panel = TextView(this).apply {
             visibility = View.GONE
-            setTextColor(Color.WHITE)
-            textSize = 15f
-            maxLines = 6
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setTextColor(0xFFE6E8EC.toInt())
+            textSize = 13f
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dp(10), dp(7), dp(10), dp(7))
             background = GradientDrawable().apply {
-                cornerRadius = dp(14).toFloat()
-                setColor(0xE6202020.toInt())
+                cornerRadius = dp(12).toFloat()
+                setColor(0xF01C1F25.toInt())
+                setStroke(dp(1), 0x1FFFFFFF)
             }
         }
 
-        bubbleLabel = TextView(this).apply {
-            text = "\uD83C\uDFA4"
-            textSize = 22f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-        }
+        // Touche de dictée : même matière et même rayon qu'une touche Gboard.
+        keyView = WaveBarsView(this)
 
-        bubble = FrameLayout(this).apply {
-            addView(
-                bubbleLabel,
-                FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER)
+        key = FrameLayout(this).apply {
+            contentDescription = "Dicter"
+            isClickable = true
+            background = keyBackground(recording = false)
+            foreground = RippleDrawable(
+                ColorStateList.valueOf(0x33FFFFFF),
+                null,
+                GradientDrawable().apply { cornerRadius = dp(10).toFloat(); setColor(Color.WHITE) }
             )
-            background = circle(0xFF2F6FED.toInt())
-            elevation = dp(6).toFloat()
+            addView(keyView, FrameLayout.LayoutParams(dp(30), dp(20), Gravity.CENTER))
+            setOnClickListener { toggleRecording() }
         }
 
-        root.addView(panel, LinearLayout.LayoutParams(dp(260), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = dp(10)
+        root.addView(panel, LinearLayout.LayoutParams(dp(232), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(6)
         })
-        root.addView(bubble, LinearLayout.LayoutParams(dp(56), dp(56)))
+        root.addView(key, LinearLayout.LayoutParams(dp(52), dp(40)))
 
         params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -187,72 +205,41 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.START
-            x = prefs.getInt("x", dp(16))
-            y = prefs.getInt("y", dp(260))
+            x = dp(6)
+            y = dp(260)
         }
 
         wm.addView(root, params)
         root.visibility = View.GONE
-        installTouch()
     }
 
-    private fun circle(color: Int) = GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(color)
+    /** Surface de touche : sombre et translucide comme une touche Gboard, liseré bleu en dictée. */
+    private fun keyBackground(recording: Boolean) = GradientDrawable().apply {
+        cornerRadius = dp(10).toFloat()
+        setColor(0xF02B3038.toInt())
+        setStroke(dp(1), if (recording) 0x804C8DFF.toInt() else 0x1FFFFFFF)
     }
 
-    /** Pose la bulle juste au-dessus de la zone clavier, pour ne pas masquer les touches. */
-    private fun moveAboveKeyboard() {
+    /**
+     * Cale la touche dans le coin bas-gauche de la zone clavier.
+     *
+     * Le clavier appartient à Gboard : on ne peut pas dessiner dedans, mais le service
+     * d'accessibilité nous donne son rectangle exact (`AccessibilityWindowInfo`), donc le
+     * bord bas de la touche s'aligne au pixel sur le bord haut du clavier, à la marge
+     * gauche du clavier. Sans clavier visible on retombe sur une estimation.
+     */
+    private fun moveToKeyboard() {
         val screenH = wm.currentWindowMetrics.bounds.height()
-        // Le clavier occupe ~52 % du bas de l'écran ; aucune API ne le dit, donc on prend une marge.
-        val aboveKeyboard = (screenH * 0.53f).toInt()
-        params.x = prefs.getInt("x", dp(8))
-        params.y = prefs.getInt("y", dp(260)).coerceAtLeast(aboveKeyboard)
-        wm.updateViewLayout(root, params)
-    }
-
-    private fun installTouch() {
-        var downX = 0f
-        var downY = 0f
-        var startX = 0
-        var startY = 0
-        var dragging = false
-
-        bubble.setOnTouchListener { _, ev ->
-            when (ev.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    downX = ev.rawX
-                    downY = ev.rawY
-                    startX = params.x
-                    startY = params.y
-                    dragging = false
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = (ev.rawX - downX).toInt()
-                    val dy = (ev.rawY - downY).toInt()
-                    if (!dragging && (Math.abs(dx) > dp(8) || Math.abs(dy) > dp(8))) dragging = true
-                    if (dragging) {
-                        params.x = (startX + dx).coerceAtLeast(0)
-                        params.y = (startY - dy).coerceAtLeast(0)
-                        wm.updateViewLayout(root, params)
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_UP -> {
-                    if (dragging) {
-                        prefs.edit().putInt("x", params.x).putInt("y", params.y).apply()
-                    } else {
-                        toggleRecording()
-                    }
-                    true
-                }
-
-                else -> false
-            }
+        val kb = keyboard
+        if (kb != null) {
+            params.x = kb.left + dp(6)
+            params.y = (screenH - kb.top).coerceAtLeast(0)
+        } else {
+            params.x = dp(6)
+            // shortcut: aucun clavier mesurable (clavier matériel), on garde ~52 % de l'écran
+            params.y = (screenH * 0.53f).toInt()
         }
+        wm.updateViewLayout(root, params)
     }
 
     // ----------------------------------------------------------- dictée
@@ -273,15 +260,12 @@ class OverlayService : Service() {
         recorder = Recorder().also { it.start() }
         recording = true
 
-        bubble.background = circle(0xFFE0353A.toInt())
+        key.background = keyBackground(recording = true)
+        keyView.active = true
         panel.text = ""
         panel.visibility = View.VISIBLE
-        pulse = ObjectAnimator.ofFloat(bubble, "scaleX", 1f, 1.18f).apply {
-            duration = 600
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            start()
-        }
+        // le clavier peut s'être ouvert entre-temps : on se recale avant d'afficher le texte
+        moveToKeyboard()
 
         thread(name = "voxkey-loop") { decodeLoop() }
     }
@@ -325,16 +309,14 @@ class OverlayService : Service() {
 
     private fun stopSession() {
         recording = false
-        pulse?.cancel()
-        pulse = null
-        bubble.scaleX = 1f
-        bubble.scaleY = 1f
-        bubble.background = circle(0xFF2F6FED.toInt())
+        keyView.active = false
+        key.background = keyBackground(recording = false)
 
         val rec = recorder
         recorder = null
         val pcm = rec?.stop() ?: FloatArray(0)
 
+        keyView.busy = true
         thread(name = "voxkey-final") {
             var finalText = ""
             val model = selectedModelPath()
@@ -343,6 +325,7 @@ class OverlayService : Service() {
             }
 
             main.post {
+                keyView.busy = false
                 if (finalText.isNotBlank()) {
                     panel.text = finalText
                     // la transcription finale remplace exactement ce qui a été inséré
