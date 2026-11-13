@@ -60,3 +60,8 @@ Pas de plugin Gboard : Gboard est fermé. On livre un clavier, l'utilisateur bas
 
 Le texte s'écrit dans le champ au fil de la dictée. Les partiels utilisent le plus
 petit modèle disponible, la transcription finale le modèle choisi dans l'app.
+
+## Installation à distance
+
+Le téléphone est dans le même tailnet que le poste : voir [docs/remote-install.md](docs/remote-install.md).
+`adb connect 100.102.55.89:5555`, puis `./gradlew installDebug`.

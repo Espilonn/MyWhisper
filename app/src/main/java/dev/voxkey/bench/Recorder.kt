@@ -83,6 +83,9 @@ class Recorder {
         return out
     }
 
+    /** Les `n` derniers échantillons (fenêtre glissante des partiels). */
+    fun tail(n: Int): FloatArray = snapshot(n)
+
     fun stop(): FloatArray {
         running = false
         worker?.join()
