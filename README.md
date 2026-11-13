@@ -49,3 +49,14 @@ Pas de plugin Gboard : Gboard est fermé. On livre un clavier, l'utilisateur bas
 - SDK : `~/Android/Sdk` (NDK et build-tools présents)
 - JDK 21 : `~/.jdks/jbr-21.0.11`
 - `adb` : `/usr/bin/adb` — **aucun appareil branché actuellement**
+
+## Utilisation
+
+1. Ouvrir **voxkey**.
+2. Autoriser la superposition, activer le service d'accessibilité, autoriser le micro.
+3. La bulle apparaît automatiquement dès qu'un champ de texte a le focus.
+4. Appui sur la bulle : dictée. Nouvel appui : arrêt.
+5. Glisser la bulle pour la déplacer (position mémorisée).
+
+Le texte s'écrit dans le champ au fil de la dictée. Les partiels utilisent le plus
+petit modèle disponible, la transcription finale le modèle choisi dans l'app.
