@@ -108,7 +108,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         modelSpinner = Spinner(act)
         model.addFull(modelSpinner, 12)
         modelEmpty = ui.text(
-            "Aucun modèle trouvé. Ajoute un fichier de modèle (.bin) à l'app, puis appuie sur Rafraîchir.",
+            "Aucun modèle trouvé. Ajoute un fichier de modèle (.bin ou .gguf) à l'app, puis appuie sur Rafraîchir.",
             13f, Ui.MUTED,
         )
         model.addFull(modelEmpty, 8)
@@ -198,7 +198,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
     private fun refreshModels() {
         val files = act.getExternalFilesDir(null)?.listFiles()
-            ?.filter { it.name.endsWith(".bin") }
+            ?.filter { it.name.endsWith(".bin") || it.name.endsWith(".gguf") }
             ?.sortedBy { it.length() }
             ?: emptyList()
 

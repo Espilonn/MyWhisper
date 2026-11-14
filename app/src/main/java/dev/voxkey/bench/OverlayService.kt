@@ -95,6 +95,7 @@ class OverlayService : Service() {
     private var lastKbMs = 0L
     /** Vrai après une perte de focus : Gboard se referme encore, on ne doit pas réafficher la bulle. */
     private var hiddenByFocus = false
+    private var kbSeen = false
     private val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
@@ -148,6 +149,10 @@ class OverlayService : Service() {
      */
     private fun onKeyboardRead(kb: Rect?) {
         val now = SystemClock.uptimeMillis()
+        if ((kb != null) != kbSeen) {
+            kbSeen = kb != null
+            Log.d("VXK", if (kb == null) "kb lost" else "kb on $kb")
+        }
         if (kb == null) {
             // `imeBounds()` renvoie parfois null une frame sur deux pendant que Gboard bouge :
             // on ne masque qu'après une absence continue, sinon la bulle clignote hors écran.
@@ -190,11 +195,10 @@ class OverlayService : Service() {
                 val kb = a11y.imeBounds()
                 if (kb != null) {
                     onKeyboardRead(kb)
-                } else if (!hiddenByFocus && root.visibility != View.VISIBLE) {
-                    // Certaines ROM n'exposent pas la fenêtre du clavier : on garde une
-                    // position de repli pour que la touche reste accessible.
-                    moveToRest()
-                    reveal()
+                } else {
+                    // Pas de repli ici : réafficher la bulle hors clavier la faisait clignoter
+                    // puis rester à l'écran après la fermeture du clavier.
+                    onKeyboardRead(null)
                 }
             }
             if (running) main.postDelayed(this, POLL_MS)
@@ -369,9 +373,13 @@ class OverlayService : Service() {
         thread(name = "voxkey-final") {
             var finalText = ""
             val model = selectedModelPath()
+            val parakeet = model?.let { isParakeetModel(it) } == true
             // porte de silence : sur du silence whisper hallucine ([Musique], sous-titres…)
-            if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && model != null && WhisperEngine.ensure(model)) {
-                finalText = cleanWhisper(WhisperEngine.transcribe(pcm, "fr", 4))
+            val ready = if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
+            if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && ready) {
+                finalText = cleanWhisper(
+                    if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
+                )
             }
 
             main.post {
@@ -385,7 +393,7 @@ class OverlayService : Service() {
                 }
                 overlayStopForeground()
                 if (!VoxkeyAccessibilityService.hasTextField) root.visibility = View.GONE
-                main.postDelayed({ WhisperEngine.release() }, 60_000)
+                main.postDelayed({ if (parakeet) ParakeetEngine.release() else WhisperEngine.release() }, 60_000)
             }
         }
     }

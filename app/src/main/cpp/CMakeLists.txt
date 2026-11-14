@@ -37,4 +37,4 @@ target_compile_definitions(voxkey PRIVATE
     $<$<BOOL:${VOXKEY_VULKAN}>:GGML_USE_VULKAN>
 )
 
-target_link_libraries(voxkey PRIVATE whisper)
+target_link_libraries(voxkey PRIVATE whisper parakeet)

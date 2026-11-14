@@ -4,6 +4,7 @@
 #include <chrono>
 #include <string>
 
+#include "parakeet.h"
 #include "whisper.h"
 
 #ifdef GGML_USE_VULKAN
@@ -142,4 +143,79 @@ Java_dev_voxkey_bench_Whisper_nativeFree(JNIEnv *, jclass, jlong j_handle) {
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_voxkey_bench_Whisper_nativeBackend(JNIEnv * env, jclass) {
     return env->NewStringUTF(kBackend);
+}
+
+// ---------------------------------------------------------------- parakeet
+// Same contract as the whisper entry points above: one handle, one JSON result.
+
+struct ParakeetHandle {
+    parakeet_context * ctx;
+    int n_threads;
+};
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_dev_voxkey_bench_Parakeet_nativeInit(JNIEnv * env, jclass, jstring j_model, jint threads) {
+    const char * model = env->GetStringUTFChars(j_model, nullptr);
+    parakeet_context_params cparams = parakeet_context_default_params();
+    cparams.use_gpu = true;  // only honoured by a GPU backend
+    parakeet_context * ctx = parakeet_init_from_file_with_params(model, cparams);
+    env->ReleaseStringUTFChars(j_model, model);
+
+    if (ctx == nullptr) return 0;
+    auto * h = new ParakeetHandle{ctx, threads > 0 ? threads : 4};
+    return reinterpret_cast<jlong>(h);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_dev_voxkey_bench_Parakeet_nativeRun(JNIEnv * env, jclass, jlong j_handle,
+                                         jfloatArray j_pcm) {
+    auto * h = reinterpret_cast<ParakeetHandle *>(j_handle);
+    if (h == nullptr) return env->NewStringUTF("{\"error\":\"no handle\"}");
+
+    jsize n = env->GetArrayLength(j_pcm);
+    jfloat * pcm = env->GetFloatArrayElements(j_pcm, nullptr);
+
+    parakeet_full_params p = parakeet_full_default_params(PARAKEET_SAMPLING_GREEDY);
+    p.n_threads  = h->n_threads;
+    p.no_context = true;
+
+    const double t0 = now_ms();
+    const int rc = parakeet_full(h->ctx, p, pcm, n);
+    const double t_end = now_ms();
+
+    env->ReleaseFloatArrayElements(j_pcm, pcm, JNI_ABORT);
+
+    if (rc != 0) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "{\"error\":\"parakeet_full failed (%d)\"}", rc);
+        return env->NewStringUTF(buf);
+    }
+
+    std::string text;
+    for (int i = 0; i < parakeet_full_n_segments(h->ctx); ++i) {
+        text += parakeet_full_get_segment_text(h->ctx, i);
+    }
+
+    // sample/encode/decode are reported by parakeet itself, in ms.
+    const parakeet_timings * t = parakeet_get_timings(h->ctx);
+    const double enc = t != nullptr ? t->encode_ms : 0.0;
+    const double dec = t != nullptr ? t->decode_ms : 0.0;
+
+    char head[256];
+    snprintf(head, sizeof(head),
+             "{\"wallMs\":%.1f,\"encodeMs\":%.1f,\"decodeMs\":%.1f,\"text\":\"",
+             t_end - t0, enc, dec);
+    std::string out = head;
+    out += json_escape(text);
+    out += "\"}";
+
+    return env->NewStringUTF(out.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_voxkey_bench_Parakeet_nativeFree(JNIEnv *, jclass, jlong j_handle) {
+    auto * h = reinterpret_cast<ParakeetHandle *>(j_handle);
+    if (h == nullptr) return;
+    parakeet_free(h->ctx);
+    delete h;
 }
