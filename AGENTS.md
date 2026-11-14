@@ -5,6 +5,7 @@
 - Annoncer avant de lancer ce qui touche à l'app : ce qui change, où, et comment revenir en arrière.
 - Une chose à la fois : pas de build + tests + fenêtres en parallèle. Commandes longues détachées, jamais au premier plan.
 - Tout réglage visuel essayé et abandonné repart de `git checkout`, pas d'ajustement empilé.
+- **Le banc instrumenté (`am instrument`) force l'arrêt de l'app et laisse son service d'accessibilité en état « crashed » : la bulle disparaît.** Après chaque exécution, réactiver en réécrivant `enabled_accessibility_services` (retirer puis remettre `dev.voxkey.bench/...VoxkeyAccessibilityService`), sinon l'utilisateur croit avoir perdu la bulle.
 
 # Build
 
