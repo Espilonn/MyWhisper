@@ -351,12 +351,12 @@ class OverlayService : Service() {
     }
 
     /**
-     * Surface de touche : sombre et translucide comme une touche Gboard, sans bordure.
+     * Surface de touche : sombre et opaque, sans bordure.
      * En écoute, un liseré jaune reprend l'accent de l'app sur la même matière.
      */
     private fun keyBackground(active: Boolean) = GradientDrawable().apply {
         cornerRadius = dp(9).toFloat()
-        setColor(0xF233373D.toInt())
+        setColor(0xFF292E33.toInt())
     }
 
     /** Affichage immédiat : pas d'animation d'entrée, qui ajouterait une frame invisible. */
