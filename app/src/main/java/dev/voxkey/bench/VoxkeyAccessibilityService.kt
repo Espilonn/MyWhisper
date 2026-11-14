@@ -48,8 +48,11 @@ class VoxkeyAccessibilityService : AccessibilityService() {
             Log.d(TAG, "focus=$has")
             OverlayService.notifyFocus(has)
         }
-        // le clavier peut apparaître/disparaître/bouger (rotation, thème, suggestions)
-        OverlayService.notifyKeyboard(if (has) imeBounds() else null)
+        // le clavier peut apparaître/disparaître/bouger (rotation, thème, suggestions).
+        // Ne jamais signaler « pas de clavier » sur la seule absence de champ éditable :
+        // certaines apps (barre de recherche du launcher) ont un clavier sans nœud focalisable,
+        // et la bulle disparaissait alors que le clavier était ouvert.
+        OverlayService.notifyKeyboard(imeBounds())
     }
 
     /** Rectangle du clavier à l'écran, ou null si aucun clavier n'est affiché. */
