@@ -4,10 +4,13 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 
 class VoxkeyAccessibilityService : AccessibilityService() {
 
@@ -24,6 +27,8 @@ class VoxkeyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
         Log.d(TAG, "a11y connected")
+        // la bulle se lance seule dès que l'accessibilité est active (sans passer par l'app)
+        startService(Intent(this, OverlayService::class.java))
     }
 
     override fun onDestroy() {
@@ -43,7 +48,14 @@ class VoxkeyAccessibilityService : AccessibilityService() {
             Log.d(TAG, "focus=$has")
             OverlayService.notifyFocus(has)
         }
+        // le clavier peut apparaître/disparaître/bouger (rotation, thème, suggestions)
+        OverlayService.notifyKeyboard(if (has) imeBounds() else null)
     }
+
+    /** Rectangle du clavier à l'écran, ou null si aucun clavier n'est affiché. */
+    fun imeBounds(): Rect? = windows
+        .firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+        ?.let { w -> Rect().also { w.getBoundsInScreen(it) } }
 
     private fun focusedEditable(): AccessibilityNodeInfo? {
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null

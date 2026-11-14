@@ -41,6 +41,9 @@ cd ~/Documents/Dev/voxkey
 
 # ou, pour une APK déjà construite
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# raccourci : reconnecte et vérifie d'un coup
+./tools/connect.sh
 ```
 
 ## Après une réinstallation

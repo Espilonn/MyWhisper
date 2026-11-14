@@ -20,8 +20,8 @@ import android.view.animation.LinearInterpolator
 class WaveBarsView(context: Context) : View(context) {
 
     private companion object {
-        const val ACCENT = 0xFF4C8DFF.toInt()
-        const val ACCENT_TOP = 0xFFA8CCFF.toInt()
+        const val ACCENT = 0xFFFFD400.toInt()
+        const val ACCENT_TOP = 0xFFFFEE8A.toInt()
         const val IDLE = 0xFF8F97A6.toInt()
         const val IDLE_TOP = 0xFFBFC6D2.toInt()
         const val PERIOD_MS = 1150L

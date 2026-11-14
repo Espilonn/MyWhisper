@@ -8,6 +8,9 @@ local.properties
 models/*.bin
 models/*.gguf
 captures/
+third_party/
+.kotlin/
+bench.jsonl
 
 third_party/
 .gradle/

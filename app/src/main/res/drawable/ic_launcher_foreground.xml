@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cinq barres façon égaliseur, mêmes proportions que WaveBarsView (0.50 0.82 1 0.72 0.42).
+     Tracées en traits à bouts ronds, dans la zone de sécurité de 66 dp au centre. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M30,47.5 V60.5 M42,41 V67 M54,37.5 V70.5 M66,43 V65 M78,49 V59"
+        android:strokeColor="#FFD400"
+        android:strokeWidth="7"
+        android:strokeLineCap="round" />
+</vector>

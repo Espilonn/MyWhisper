@@ -5,11 +5,13 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
     }
 }
-rootProject.name = "voxkey"
+
+rootProject.name = "voxkey-bench"
 include(":app")
