@@ -72,7 +72,11 @@ class VoxkeyAccessibilityService : AccessibilityService() {
     }
 
     /** Remplace, dans le champ actif, l'occurrence de [old] par [new], sans toucher au reste.
-     *  Cherche [old] dans le texte courant ; à défaut, écrit [new] à la position du curseur. */
+     *  Cherche [old] dans le texte courant ; à défaut, écrit [new] à la position du curseur.
+     *
+     *  Le résultat dit seulement si le collage a été *envoyé* : ACTION_PASTE est asynchrone,
+     *  relire le champ juste après renvoie encore l'ancien texte. Cette relecture faisait
+     *  croire à un échec, et l'appelant collait une seconde fois — la transcription en double. */
     fun replaceText(old: String, new: String): Boolean {
         val node = focusedEditable() ?: return false
         val text = node.text?.toString() ?: ""
@@ -83,14 +87,10 @@ class VoxkeyAccessibilityService : AccessibilityService() {
         val idx = if (old.isEmpty()) -1 else nearestOccurrence(text, old, cursor)
         if (idx < 0) {
             select(cursor, cursor)
-            // premier partiel : insertion au curseur, succès si le collage a marché
-            if (old.isEmpty()) return pasteAndCheck(new)
-            // old disparu (champ réécrit) : on ajoute quand même, mais on le signale
-            paste(new)
-            return false
+            return paste(new)
         }
         if (!select(idx, idx + old.length)) return false
-        return pasteAndCheck(new)
+        return paste(new)
     }
 
     /** Occurrence de [old] la plus proche du curseur (celle qui le contient de préférence). */
@@ -120,11 +120,6 @@ class VoxkeyAccessibilityService : AccessibilityService() {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, end)
         }
         return node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, args)
-    }
-
-    private fun pasteAndCheck(new: String): Boolean {
-        if (!paste(new)) return false
-        return focusedEditable()?.text?.toString()?.contains(new) ?: false
     }
 
     /** Met [text] dans le presse-papier puis colle à la sélection courante. */
