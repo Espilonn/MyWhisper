@@ -53,6 +53,10 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private val steps = mutableListOf<Step>()
     private lateinit var modelSpinner: Spinner
     private lateinit var modelEmpty: TextView
+    private lateinit var downloadBox: LinearLayout
+    private lateinit var downloadStatus: TextView
+    /** Un seul téléchargement à la fois ; les boutons sont reconstruits désactivés pendant l'attente. */
+    private var downloading = false
     /** Vrai pendant qu'on réaligne le spinner sur la préférence : ne pas réécrire le choix. */
     private var suppressModelWrite = false
     val view: ScrollView
@@ -115,6 +119,10 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         )
         model.addFull(modelEmpty, 8)
         model.addFull(ui.button("Rafraîchir", primary = false) { refreshModels() }, 12)
+        downloadBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+        model.addFull(downloadBox, 10)
+        downloadStatus = ui.text("", 13f, Ui.MUTED)
+        model.addFull(downloadStatus, 4)
         content.addFull(model, 16)
 
         val dictation = ui.card()
@@ -231,6 +239,67 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         suppressModelWrite = true
         if (idx >= 0) modelSpinner.setSelection(idx)
         modelSpinner.post { suppressModelWrite = false }
+
+        renderDownloads(files.map { it.name }.toSet())
+    }
+
+    /** Une ligne par modèle du catalogue absent du téléphone. */
+    private fun renderDownloads(present: Set<String>) {
+        downloadBox.removeAllViews()
+        val missing = ModelCatalog.all.filter { it.file !in present }
+        if (missing.isEmpty()) {
+            downloadBox.addFull(ui.text("Tous les modèles proposés sont installés.", 13f, Ui.MUTED), 6)
+            return
+        }
+        downloadBox.addFull(ui.text("Télécharger un modèle", 14f, Ui.INK, bold = true), 12)
+        for (m in missing) {
+            downloadBox.addFull(ui.text("${m.label} · ${m.mo} Mo", 13f, Ui.MUTED), 8)
+            val b = ui.button("Télécharger", primary = false) { startDownload(m) }
+            b.isEnabled = !downloading
+            b.alpha = if (downloading) 0.4f else 1f
+            downloadBox.addFull(b, 6)
+        }
+    }
+
+    private fun startDownload(m: ModelCatalog.Remote) {
+        val dir = act.getExternalFilesDir(null)
+        if (dir == null) {
+            Toast.makeText(act, "Stockage indisponible", Toast.LENGTH_SHORT).show()
+            return
+        }
+        downloading = true
+        downloadStatus.text = "${m.label} : connexion…"
+        refreshModels()
+        ModelCatalog.download(
+            m.file, dir,
+            onProgress = { done, total ->
+                act.runOnUiThread {
+                    downloadStatus.text = if (total > 0) {
+                        "${m.label} : ${done * 100 / total} % (${done / 1_048_576} / ${m.mo} Mo)"
+                    } else {
+                        "${m.label} : ${done / 1_048_576} Mo"
+                    }
+                }
+            },
+            onDone = {
+                act.runOnUiThread {
+                    downloading = false
+                    act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
+                        .edit().putString("model", m.file).apply()
+                    downloadStatus.text = "${m.label} : installé et sélectionné."
+                    Toast.makeText(act, "Modèle prêt", Toast.LENGTH_SHORT).show()
+                    refreshModels()
+                }
+            },
+            onError = { msg ->
+                act.runOnUiThread {
+                    downloading = false
+                    downloadStatus.text = "Échec du téléchargement : $msg"
+                    Toast.makeText(act, "Échec : $msg", Toast.LENGTH_LONG).show()
+                    refreshModels()
+                }
+            },
+        )
     }
 
     private fun ensureBubble() {
