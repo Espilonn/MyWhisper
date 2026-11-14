@@ -374,26 +374,32 @@ class OverlayService : Service() {
             var finalText = ""
             val model = selectedModelPath()
             val parakeet = model?.let { isParakeetModel(it) } == true
-            // porte de silence : sur du silence whisper hallucine ([Musique], sous-titres…)
-            val ready = if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
-            if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && ready) {
-                finalText = cleanWhisper(
-                    if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
-                )
-            }
-
-            main.post {
-                keyView.busy = false
-                if (finalText.isNotBlank()) {
-                    // la transcription finale remplace exactement ce qui a été inséré
-                    if (VoxkeyAccessibilityService.instance?.replaceText(pushed, finalText) != true) {
-                        VoxkeyAccessibilityService.instance?.paste(finalText)
-                    }
-                    pushed = finalText
+            try {
+                val ready = if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
+                // porte de silence : sur du silence whisper hallucine ([Musique], sous-titres…)
+                if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && ready) {
+                    finalText = cleanWhisper(
+                        if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
+                    )
                 }
-                overlayStopForeground()
-                if (!VoxkeyAccessibilityService.hasTextField) root.visibility = View.GONE
-                main.postDelayed({ if (parakeet) ParakeetEngine.release() else WhisperEngine.release() }, 60_000)
+                Log.d("VXK", "final model=${model?.substringAfterLast('/')} parakeet=$parakeet ready=$ready pcm=${pcm.size} chars=${finalText.length}")
+            } catch (t: Throwable) {
+                // Sans ce filet, une erreur du moteur laissait l'animation « recherche » pour toujours.
+                Log.e("VXK", "final failed", t)
+            } finally {
+                main.post {
+                    keyView.busy = false
+                    if (finalText.isNotBlank()) {
+                        // la transcription finale remplace exactement ce qui a été inséré
+                        if (VoxkeyAccessibilityService.instance?.replaceText(pushed, finalText) != true) {
+                            VoxkeyAccessibilityService.instance?.paste(finalText)
+                        }
+                        pushed = finalText
+                    }
+                    overlayStopForeground()
+                    if (!VoxkeyAccessibilityService.hasTextField) root.visibility = View.GONE
+                    main.postDelayed({ if (parakeet) ParakeetEngine.release() else WhisperEngine.release() }, 60_000)
+                }
             }
         }
     }

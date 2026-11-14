@@ -53,6 +53,8 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private val steps = mutableListOf<Step>()
     private lateinit var modelSpinner: Spinner
     private lateinit var modelEmpty: TextView
+    /** Vrai pendant qu'on réaligne le spinner sur la préférence : ne pas réécrire le choix. */
+    private var suppressModelWrite = false
     val view: ScrollView
 
     init {
@@ -213,10 +215,12 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val prefs = act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
         val saved = prefs.getString("model", null)
         val idx = files.indexOfFirst { it.name == saved }
-        if (idx >= 0) modelSpinner.setSelection(idx)
 
+        // Le listener est posé AVANT setSelection : sinon un rafraîchissement de l'écran
+        // réécrivait le modèle choisi par le premier de la liste (le plus petit).
         modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                if (suppressModelWrite) return
                 files.getOrNull(pos)?.let {
                     prefs.edit().putString("model", it.name).apply()
                 }
@@ -224,6 +228,9 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
+        suppressModelWrite = true
+        if (idx >= 0) modelSpinner.setSelection(idx)
+        modelSpinner.post { suppressModelWrite = false }
     }
 
     private fun ensureBubble() {

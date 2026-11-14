@@ -14,6 +14,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        // On-device benchmarks only; the shipping app never links this.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         ndk {
             abiFilters += "arm64-v8a"
         }
@@ -44,4 +47,6 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
