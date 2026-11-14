@@ -44,6 +44,11 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val buttonLabel: String,
         val isDone: () -> Boolean,
         val onAction: () -> Unit,
+        /** Étiquette et action quand l'étape est déjà faite (bouton inverse). */
+        val altLabel: String? = null,
+        val altAction: (() -> Unit)? = null,
+        /** Garde le bouton visible même quand l'étape est faite (réglage, pas une permission). */
+        val alwaysShowButton: Boolean = false,
     ) {
         lateinit var badge: TextView
         lateinit var status: TextView
@@ -93,8 +98,11 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             hint = "Apparaît en bas à gauche du clavier.",
             doneText = "Active",
             buttonLabel = "Activer la touche de dictée",
-            isDone = { OverlayService.running },
-            onAction = { ensureBubble() },
+            isDone = { OverlayService.isEnabled(act) },
+            onAction = { setBubble(true) },
+            altLabel = "Désactiver la touche de dictée",
+            altAction = { setBubble(false) },
+            alwaysShowButton = true,
         )
 
         val content = LinearLayout(act).apply {
@@ -156,7 +164,9 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             layoutParams = LinearLayout.LayoutParams(ui.dp(28), ui.dp(28))
         }
         s.status = ui.text("", 13f, Ui.MUTED)
-        s.button = ui.button(s.buttonLabel, primary = true) { s.onAction() }
+        s.button = ui.button(s.buttonLabel, primary = true) {
+            if (s.isDone() && s.altAction != null) s.altAction.invoke() else s.onAction()
+        }
 
         val labels = LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
@@ -202,7 +212,9 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             )
             s.status.text = if (isDone) s.doneText else s.hint
             s.status.setTextColor(if (isDone) Ui.GOOD else Ui.MUTED)
-            s.button.visibility = if (isCurrent) View.VISIBLE else View.GONE
+            if (s.altLabel != null) s.button.text = if (isDone) s.altLabel else s.buttonLabel
+            s.button.visibility =
+                if (isCurrent || s.alwaysShowButton) View.VISIBLE else View.GONE
         }
     }
 
@@ -302,12 +314,18 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         )
     }
 
-    private fun ensureBubble() {
-        if (!Settings.canDrawOverlays(act)) {
+    /** Active ou coupe la bulle (préférence lue aussi au démarrage du service et de l'accessibilité). */
+    private fun setBubble(on: Boolean) {
+        if (on && !isAccessibilityOn(act) && !Settings.canDrawOverlays(act)) {
             Toast.makeText(act, "Autorise d'abord la superposition", Toast.LENGTH_SHORT).show()
             return
         }
-        act.startService(Intent(act, OverlayService::class.java))
-        Toast.makeText(act, "Touche de dictée activée", Toast.LENGTH_SHORT).show()
+        OverlayService.setEnabled(act, on)
+        Toast.makeText(
+            act,
+            if (on) "Touche de dictée activée" else "Touche de dictée désactivée",
+            Toast.LENGTH_SHORT,
+        ).show()
+        refreshState()
     }
 }

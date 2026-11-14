@@ -94,8 +94,8 @@ class MainActivity : Activity() {
         select(0)
 
         // La bulle n'a pas besoin qu'on la lance à la main : elle vit tant que
-        // la permission est là.
-        if (android.provider.Settings.canDrawOverlays(this)) {
+        // la permission est là et que l'utilisateur ne l'a pas désactivée.
+        if (OverlayService.isEnabled(this) && android.provider.Settings.canDrawOverlays(this)) {
             startService(Intent(this, OverlayService::class.java))
         }
 

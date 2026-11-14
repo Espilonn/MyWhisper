@@ -68,6 +68,20 @@ class OverlayService : Service() {
         var running = false
             private set
 
+        /** Redemande la recréation de la fenêtre (connexion d'accessibilité renouvelée). */
+        const val EXTRA_REBUILD = "rebuild"
+        private const val PREF_ENABLED = "bubble_enabled"
+
+        /** Bulle voulue par l'utilisateur (Réglages). Par défaut : activée. */
+        fun isEnabled(ctx: Context): Boolean =
+            ctx.getSharedPreferences("voxkey", MODE_PRIVATE).getBoolean(PREF_ENABLED, true)
+
+        fun setEnabled(ctx: Context, on: Boolean) {
+            ctx.getSharedPreferences("voxkey", MODE_PRIVATE).edit().putBoolean(PREF_ENABLED, on).apply()
+            val intent = Intent(ctx, OverlayService::class.java)
+            if (on) ctx.startService(intent) else ctx.stopService(intent)
+        }
+
         private var focusListener: ((Boolean) -> Unit)? = null
         private var keyboardListener: ((Rect?) -> Unit)? = null
 
@@ -96,6 +110,8 @@ class OverlayService : Service() {
     /** Vrai après une perte de focus : Gboard se referme encore, on ne doit pas réafficher la bulle. */
     private var hiddenByFocus = false
     private var kbSeen = false
+    /** Dernière tentative de recréation de la fenêtre (anti-boucle). */
+    private var lastReattachMs = 0L
     private val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
@@ -111,6 +127,10 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (!isEnabled(this)) {
+            stopSelf()
+            return
+        }
         // Avec le service d'accessibilité, la fenêtre est de type ACCESSIBILITY_OVERLAY :
         // aucune permission système n'est requise (et elle survit aux réinstallations).
         if (VoxkeyAccessibilityService.instance == null && !Settings.canDrawOverlays(this)) {
@@ -186,20 +206,31 @@ class OverlayService : Service() {
     /** Filet de sécurité : relit le clavier à intervalle court, et gère l'enregistrement. */
     private val poll = object : Runnable {
         override fun run() {
-            val a11y = VoxkeyAccessibilityService.instance
-            if (recording) {
-                if (root.visibility != View.VISIBLE) reveal()
-            } else if (a11y != null) {
-                // `hasTextField` n'est pas fiable sur les champs custom : la géométrie du
-                // clavier suffit à savoir qu'un champ est actif.
-                val kb = a11y.imeBounds()
-                if (kb != null) {
-                    onKeyboardRead(kb)
-                } else {
-                    // Pas de repli ici : réafficher la bulle hors clavier la faisait clignoter
-                    // puis rester à l'écran après la fermeture du clavier.
-                    onKeyboardRead(null)
+            try {
+                // Filet de sécurité pour une fenêtre détruite sans que le service le sache.
+                val now = SystemClock.uptimeMillis()
+                if (!root.isAttachedToWindow && now - lastReattachMs > 2000) {
+                    lastReattachMs = now
+                    reattach()
                 }
+                val a11y = VoxkeyAccessibilityService.instance
+                if (recording) {
+                    if (root.visibility != View.VISIBLE) reveal()
+                } else if (a11y != null) {
+                    // `hasTextField` n'est pas fiable sur les champs custom : la géométrie du
+                    // clavier suffit à savoir qu'un champ est actif.
+                    val kb = a11y.imeBounds()
+                    if (kb != null) {
+                        onKeyboardRead(kb)
+                    } else {
+                        // Pas de repli ici : réafficher la bulle hors clavier la faisait clignoter
+                        // puis rester à l'écran après la fermeture du clavier.
+                        onKeyboardRead(null)
+                    }
+                }
+            } catch (t: Throwable) {
+                // Sans ça, une exception ici arrêterait définitivement la surveillance.
+                Log.e("VXK", "poll failed", t)
             }
             if (running) main.postDelayed(this, POLL_MS)
         }
@@ -217,7 +248,42 @@ class OverlayService : Service() {
         wm.updateViewLayout(root, params)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Une connexion d'accessibilité renouvelée détruit les fenêtres qui en dépendent ;
+        // le service, lui, survit : on recrée la sienne, sinon elle ne revient jamais.
+        if (intent?.getBooleanExtra(EXTRA_REBUILD, false) == true && this::root.isInitialized) {
+            main.post { reattach() }
+        }
+        return START_STICKY
+    }
+
+    /** Recrée la fenêtre de la bulle (l'ancienne est orpheline, `visibility` n'y fait plus rien).
+     *  Le WindowManager est repris sur la connexion d'accessibilité courante : celui capturé au
+     *  démarrage porte le jeton de la connexion précédente, et `addView` échoue alors en
+     *  `BadTokenException` — la bulle ne revenait jamais. */
+    private fun reattach() {
+        if (!running) return
+        try {
+            wm.removeView(root)
+        } catch (_: Exception) {
+        }
+        try {
+            val a11y = VoxkeyAccessibilityService.instance
+            wm = (a11y ?: this).getSystemService(WINDOW_SERVICE) as WindowManager
+            params.type = if (a11y != null)
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            else
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            // WMS réécrit `token` dans nos params au premier ajout : le garder ferait échouer
+            // tous les ajouts suivants en `BadTokenException` (connexion morte).
+            params.token = null
+            wm.addView(root, params)
+            root.visibility = if (recording) View.VISIBLE else View.GONE
+            Log.d("VXK", "reattach ok a11y=${a11y != null}")
+        } catch (t: Throwable) {
+            Log.e("VXK", "reattach failed", t)
+        }
+    }
 
     override fun onDestroy() {
         focusListener = null

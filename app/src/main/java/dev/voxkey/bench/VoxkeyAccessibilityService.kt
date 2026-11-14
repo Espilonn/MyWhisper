@@ -27,8 +27,14 @@ class VoxkeyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
         Log.d(TAG, "a11y connected")
-        // la bulle se lance seule dès que l'accessibilité est active (sans passer par l'app)
-        startService(Intent(this, OverlayService::class.java))
+        // la bulle se lance seule dès que l'accessibilité est active (sans passer par l'app).
+        // `rebuild` : cette connexion a détruit les fenêtres de la précédente, qui sont orphelines.
+        if (OverlayService.isEnabled(this)) {
+            startService(
+                Intent(this, OverlayService::class.java)
+                    .putExtra(OverlayService.EXTRA_REBUILD, true)
+            )
+        }
     }
 
     override fun onDestroy() {
