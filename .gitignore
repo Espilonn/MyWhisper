@@ -17,3 +17,7 @@ bench.jsonl
 build/
 app/build/
 local.properties
+
+# Clé de signature : ne jamais commiter
+keystore.properties
+keys/

@@ -7,7 +7,7 @@ champ actif.
 Aucun audio ne quitte le téléphone : la transcription tourne en local sur le CPU, avec
 [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF) quantisé.
 
-> État : `0.1.0`, en développement actif. Les identifiants internes (`dev.voxkey.bench`,
+> Version **1.0.0**. APK signé (6 Mo, arm64, Android 12+) : [Releases](https://github.com/EspiIon/MyWisper/releases/latest). Les identifiants internes (`dev.voxkey.bench`,
 > base `voxkey.db`, préférences `voxkey`) datent du nom de travail « voxkey » et n'ont pas
 > encore été migrés — les renommer créerait une seconde application et imposerait de
 > retélécharger les modèles.
