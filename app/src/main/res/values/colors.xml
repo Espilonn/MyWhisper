@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FF14161B</color>
+
+    <!-- Mêmes valeurs que les jetons de Ui.kt : le thème système doit poser la même matière. -->
+    <color name="app_bg">#FF0B0C0F</color>
+    <color name="app_accent">#FFFFD400</color>
 </resources>

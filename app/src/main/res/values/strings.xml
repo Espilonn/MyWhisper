@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">voxkey</string>
-    <string name="a11y_desc">Permet à voxkey d\u2019écrire le texte dicté dans le champ actif.</string>
+    <string name="app_name">MyWisper</string>
+    <string name="a11y_desc">Permet à MyWisper d\u2019écrire le texte dicté dans le champ actif.</string>
 </resources>

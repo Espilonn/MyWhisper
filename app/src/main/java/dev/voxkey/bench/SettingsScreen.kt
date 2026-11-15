@@ -8,11 +8,11 @@ import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -24,6 +24,12 @@ import android.widget.Toast
 class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
     companion object {
+        /** Préférence qui débloque le banc d'essai (7 appuis sur « Version »). */
+        const val BENCH_VISIBLE = "bench_visible"
+
+        fun benchVisible(act: Activity) =
+            act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE).getBoolean(BENCH_VISIBLE, false)
+
         fun isAccessibilityOn(act: Activity): Boolean {
             val enabled = Settings.Secure.getString(
                 act.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -56,15 +62,35 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     }
 
     private val steps = mutableListOf<Step>()
+
+    /** Emplacement du banc d'essai, rempli par MainActivity seulement s'il est débloqué. */
+    val benchSlot = LinearLayout(act)
+
+    /** Prévient MainActivity du déblocage, pour poser ou masquer la carte sans redémarrer. */
+    var onBenchVisibilityChanged: ((Boolean) -> Unit)? = null
+
+    /** Prévient MainActivity d'un changement d'accent : les cinq écrans sont repeints. */
+    var onAccentChanged: (() -> Unit)? = null
+
+    private var versionTaps = 0
+
+    private val page = ui.page("Réglages", "Droits, modèle et fonctionnement de la dictée.")
+    private val content = page.body
+
     private lateinit var modelSpinner: Spinner
+    private lateinit var modelField: LinearLayout
+    private lateinit var modelRefresh: TextView
+    private lateinit var accentName: TextView
+    private lateinit var accentRow: LinearLayout
     private lateinit var modelEmpty: TextView
     private lateinit var downloadBox: LinearLayout
     private lateinit var downloadStatus: TextView
+    private lateinit var setupProgress: TextView
     /** Un seul téléchargement à la fois ; les boutons sont reconstruits désactivés pendant l'attente. */
     private var downloading = false
     /** Vrai pendant qu'on réaligne le spinner sur la préférence : ne pas réécrire le choix. */
     private var suppressModelWrite = false
-    val view: ScrollView
+    val view: View = page.root
 
     init {
         steps += Step(
@@ -105,74 +131,185 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             alwaysShowButton = true,
         )
 
-        val content = LinearLayout(act).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(ui.dp(20), ui.dp(28), ui.dp(20), ui.dp(24))
-        }
-        content.addView(ui.text("Réglages", 26f, Ui.INK, bold = true))
-        content.addFull(ui.text("Droits, modèle et fonctionnement de la dictée.", 14f, Ui.MUTED), 4)
-
         val setup = ui.card()
-        setup.addView(ui.sectionTitle(R.drawable.ic_nav_settings, "Mise en place"))
-        steps.forEachIndexed { i, s -> setup.addFull(stepRow(s), if (i == 0) 14 else 18) }
-        content.addFull(setup, 20)
+        val setupHead = LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ui.label("Mise en place"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            setupProgress = ui.meta("")
+            addView(setupProgress)
+        }
+        setup.addView(setupHead)
+        steps.forEachIndexed { i, s ->
+            if (i > 0) setup.addRule()
+            setup.addFull(stepRow(s), if (i == 0) 6 else 0)
+        }
+        content.addView(setup, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        // Apparence : un accent unique, choisi parmi cinq, qui recolore toute l'app.
+        val theme = ui.card()
+        val themeHead = LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ui.label("Apparence"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            accentName = ui.meta("")
+            addView(accentName)
+        }
+        theme.addView(themeHead)
+        accentRow = LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        theme.addView(accentRow, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
+        theme.addView(ui.meta("La couleur des boutons, de la pastille active et de la bulle.").apply {
+            setPadding(0, ui.dp(14), 0, 0)
+        })
+        content.addFull(theme, 16)
 
         val model = ui.card()
-        model.addView(ui.sectionTitle(R.drawable.ic_words, "Modèle de reconnaissance"))
-        modelSpinner = Spinner(act)
-        model.addFull(modelSpinner, 12)
-        modelEmpty = ui.text(
+        val modelHead = LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ui.label("Modèle de reconnaissance"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.text("Rafraîchir", 13f, Ui.ACCENT).apply {
+                modelRefresh = this
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                setPadding(ui.dp(10), ui.dp(10), 0, ui.dp(10))
+                setOnClickListener { refreshModels() }
+            })
+        }
+        model.addView(modelHead)
+        // Un sélecteur maison : le Spinner système impose sa propre taille de texte.
+        modelSpinner = Spinner(act).apply {
+            isFocusable = false
+            background = null
+            setPadding(ui.dp(14), 0, ui.dp(6), 0)
+        }
+        modelField = LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = ui.rounded(Ui.CARD_HI, 14, Ui.LINE)
+            addView(modelSpinner, LinearLayout.LayoutParams(0, ui.dp(52), 1f))
+            addView(ui.icon(R.drawable.ic_chevron, Ui.MUTED, 18).apply {
+                scaleType = android.widget.ImageView.ScaleType.CENTER
+                layoutParams = LinearLayout.LayoutParams(ui.dp(26), ui.dp(18)).apply { rightMargin = ui.dp(14) }
+            })
+            setOnClickListener { modelSpinner.performClick() }
+        }
+        model.addFull(modelField, 10)
+        modelEmpty = ui.meta(
             "Aucun modèle trouvé. Ajoute un fichier de modèle (.bin ou .gguf) à l'app, puis appuie sur Rafraîchir.",
-            13f, Ui.MUTED,
         )
         model.addFull(modelEmpty, 8)
-        model.addFull(ui.button("Rafraîchir", primary = false) { refreshModels() }, 12)
         downloadBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
-        model.addFull(downloadBox, 10)
-        downloadStatus = ui.text("", 13f, Ui.MUTED)
-        model.addFull(downloadStatus, 4)
+        model.addFull(downloadBox, 6)
+        downloadStatus = ui.meta("")
+        model.addFull(downloadStatus, 12)
         content.addFull(model, 16)
 
         val dictation = ui.card()
-        dictation.addView(ui.sectionTitle(R.drawable.ic_nav_home, "Dictée"))
-        dictation.addFull(ui.row("Langue", "Français"), 14)
-        dictation.addFull(ui.row("Commande", "Appui pour dicter, appui pour arrêter"), 8)
-        dictation.addFull(ui.row("Transcription", "Sur le téléphone"), 8)
-        dictation.addFull(ui.row("Pour dicter", "Ouvre un champ de texte : la touche apparaît en bas à gauche du clavier."), 8)
+        dictation.addView(ui.label("Dictée"))
+        listOf(
+            "Langue" to "Français",
+            "Commande" to "Appui pour dicter, appui pour arrêter",
+            "Transcription" to "Sur le téléphone",
+            "Pour dicter" to "Ouvre un champ de texte : la touche apparaît en bas à gauche du clavier.",
+        ).forEachIndexed { i, (label, value) ->
+            if (i > 0) dictation.addRule()
+            dictation.addView(ui.row(label, value))
+        }
         content.addFull(dictation, 16)
 
         val about = ui.card()
-        about.addView(ui.sectionTitle(R.drawable.ic_nav_dictionary, "À propos"))
-        about.addFull(ui.row("Version", appVersion()), 14)
+        about.addView(ui.label("À propos"))
+        about.addView(ui.row("Version", appVersion()).apply {
+            setOnClickListener { countVersionTap() }
+        })
         content.addFull(about, 16)
 
-        view = ScrollView(act).apply { addView(content) }
+        // Emplacement du banc d'essai : vide tant qu'il n'est pas débloqué.
+        content.addFull(benchSlot, 0)
     }
 
     /** Relit l'état des droits et des modèles (appelé à chaque retour sur l'app). */
     fun refresh() {
         refreshState()
         refreshModels()
+        renderAccents()
+        modelRefresh.setTextColor(Ui.ACCENT)
+    }
+
+    /** Les cinq accents proposés ; celui qui est actif porte un anneau. */
+    private fun renderAccents() {
+        accentName.text = Accent.name()
+        accentRow.removeAllViews()
+        Accent.palette.forEach { (name, color) ->
+            val on = Accent.current() == color
+            accentRow.addView(FrameLayout(act).apply {
+                contentDescription = "Accent $name"
+                background = swatch(color, on)
+                layoutParams = LinearLayout.LayoutParams(ui.dp(44), ui.dp(44)).apply {
+                    rightMargin = ui.dp(12)
+                }
+                setOnClickListener { pickAccent(color) }
+            })
+        }
+    }
+
+    private fun swatch(color: Int, selected: Boolean): android.graphics.drawable.Drawable {
+        val tv = android.util.TypedValue()
+        val found = act.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+        val ripple = if (found && tv.resourceId != 0) act.getDrawable(tv.resourceId) else null
+        val base = ui.rounded(color, 99, if (selected) Ui.INK else null)
+        if (ripple == null) return base
+        return android.graphics.drawable.LayerDrawable(arrayOf(base, ripple))
+    }
+
+    private fun pickAccent(color: Int) {
+        if (Accent.current() == color) return
+        Accent.set(act, color)
+        renderAccents()
+        onAccentChanged?.invoke()
+    }
+
+    /**
+     * Geste discret : sept appuis sur « Version » ouvrent ou ferment le banc d'essai.
+     * Rien à l'écran ne le laisse deviner ; c'est un outil de mesure, pas une fonction.
+     */
+    private fun countVersionTap() {
+        versionTaps++
+        if (versionTaps < 7) return
+        versionTaps = 0
+        val on = !benchVisible(act)
+        act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
+            .edit().putBoolean(BENCH_VISIBLE, on).apply()
+        Toast.makeText(
+            act,
+            if (on) "Banc d'essai activé" else "Banc d'essai masqué",
+            Toast.LENGTH_SHORT,
+        ).show()
+        onBenchVisibilityChanged?.invoke(on)
     }
 
     private fun appVersion(): String =
         act.packageManager.getPackageInfo(act.packageName, 0).versionName ?: "inconnue"
 
     private fun stepRow(s: Step): View {
-        s.badge = ui.text("", 14f, Ui.INK, bold = true).apply {
+        s.badge = ui.text("", 13f, Ui.INK).apply {
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(ui.dp(28), ui.dp(28))
+            layoutParams = LinearLayout.LayoutParams(ui.dp(30), ui.dp(30))
         }
-        s.status = ui.text("", 13f, Ui.MUTED)
+        s.status = ui.meta("")
         s.button = ui.button(s.buttonLabel, primary = true) {
             if (s.isDone() && s.altAction != null) s.altAction.invoke() else s.onAction()
         }
 
         val labels = LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
-            addView(ui.text(s.title, 16f, Ui.INK, bold = true))
-            addView(s.status)
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = ui.dp(12) }
+            addView(ui.heading(s.title))
+            addView(s.status, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(3) })
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = ui.dp(14) }
         }
         val head = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -182,6 +319,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         }
         return LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
+            setPadding(0, ui.dp(14), 0, ui.dp(14))
             addView(head)
             addFull(s.button, 12)
         }
@@ -191,28 +329,32 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private fun refreshState() {
         val done = steps.map { it.isDone() }
         val current = done.indexOf(false)
+        setupProgress.text = "${done.count { it }} sur ${steps.size}"
         steps.forEachIndexed { i, s ->
             val isDone = done[i]
             val isCurrent = i == current
             s.badge.text = if (isDone) "✓" else "${s.number}"
             s.badge.setTextColor(
                 when {
-                    isDone -> Ui.INK
+                    isDone -> Ui.GOOD
                     isCurrent -> Ui.ON_ACCENT
                     else -> Ui.MUTED
                 }
             )
             s.badge.background = ui.rounded(
                 when {
-                    isDone -> Ui.LINE
+                    isDone -> Ui.GOOD_BG
                     isCurrent -> Ui.ACCENT
                     else -> Ui.CARD_HI
                 },
-                14,
+                99,
             )
             s.status.text = if (isDone) s.doneText else s.hint
             s.status.setTextColor(if (isDone) Ui.GOOD else Ui.MUTED)
+            // Le bouton inverse d'une étape faite est un réglage, pas une permission : discret.
             if (s.altLabel != null) s.button.text = if (isDone) s.altLabel else s.buttonLabel
+            s.button.background = ui.tappable(if (isDone && s.altLabel != null) Ui.CARD_HI else Ui.ACCENT, 16)
+            s.button.setTextColor(if (isDone && s.altLabel != null) Ui.INK else Ui.ON_ACCENT)
             s.button.visibility =
                 if (isCurrent || s.alwaysShowButton) View.VISIBLE else View.GONE
         }
@@ -224,12 +366,27 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             ?.sortedBy { it.length() }
             ?: emptyList()
 
-        modelSpinner.adapter = ArrayAdapter(
-            act,
-            android.R.layout.simple_spinner_dropdown_item,
-            files.map { "${it.name} (${it.length() / 1_048_576} Mo)" }
-        )
+        modelSpinner.adapter = object : ArrayAdapter<String>(act, 0, files.map { "${it.name} (${it.length() / 1_048_576} Mo)" }) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                ui.body(getItem(position).orEmpty(), Ui.INK).apply {
+                    typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                    gravity = Gravity.CENTER_VERTICAL
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                    layoutParams = android.widget.AbsListView.LayoutParams(MATCH, ui.dp(52))
+                    setPadding(ui.dp(2), 0, ui.dp(2), 0)
+                }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                ui.body(getItem(position).orEmpty(), Ui.INK).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = ui.tappable(Ui.CARD_HI, 0)
+                    layoutParams = android.widget.AbsListView.LayoutParams(MATCH, ui.dp(48))
+                    setPadding(ui.dp(16), 0, ui.dp(16), 0)
+                }
+        }
         modelSpinner.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
+        modelField.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
         modelEmpty.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
 
         val prefs = act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
@@ -260,16 +417,16 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         downloadBox.removeAllViews()
         val missing = ModelCatalog.all.filter { it.file !in present }
         if (missing.isEmpty()) {
-            downloadBox.addFull(ui.text("Tous les modèles proposés sont installés.", 13f, Ui.MUTED), 6)
+            downloadBox.addFull(ui.meta("Tous les modèles proposés sont installés."), 6)
             return
         }
-        downloadBox.addFull(ui.text("Télécharger un modèle", 14f, Ui.INK, bold = true), 12)
+        downloadBox.addFull(ui.label("Télécharger un modèle"), 16)
         for (m in missing) {
-            downloadBox.addFull(ui.text("${m.label} · ${m.mo} Mo", 13f, Ui.MUTED), 8)
+            downloadBox.addFull(ui.meta("${m.label} · ${m.mo} Mo"), 10)
             val b = ui.button("Télécharger", primary = false) { startDownload(m) }
             b.isEnabled = !downloading
             b.alpha = if (downloading) 0.4f else 1f
-            downloadBox.addFull(b, 6)
+            downloadBox.addFull(b, 8)
         }
     }
 

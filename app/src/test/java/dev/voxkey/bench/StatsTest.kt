@@ -28,23 +28,65 @@ class StatsTest {
         assertEquals(0, countWords("   "))
         assertEquals(4, countWords("Courses : lait, pain, café"))
     }
+}
+
+/** Extraction des mots du dictionnaire (Store.kt) : ajouté en fin de fichier. */
+class WordsInTest {
 
     @Test
-    fun filterWordsIsCaseInsensitiveAndKeepsOrder() {
-        val entries = listOf(
-            SampleData.DictEntry("Voxkey", 14),
-            SampleData.DictEntry("TVA", 5),
-            SampleData.DictEntry("Gradle", 4),
+    fun wordsInKeepsInnerPunctuationAndDropsEdges() {
+        assertEquals(
+            listOf("Peux-tu", "m'envoyer", "devis", "avant", "vendredi"),
+            wordsIn("Peux-tu m'envoyer le devis avant vendredi ?"),
         )
-        assertEquals(entries, filterWords(entries, "  "))
-        assertEquals(listOf(entries[0]), filterWords(entries, "VOX"))
-        assertEquals(listOf(entries[2]), filterWords(entries, "dle"))
-        assertEquals(emptyList<SampleData.DictEntry>(), filterWords(entries, "zzz"))
+        assertEquals(listOf("TVA", "2026"), wordsIn("  \"TVA\", (2026).  "))
     }
 
     @Test
-    fun sampleMonthMatchesDailySeries() {
-        assertEquals(1248, SampleData.wordsThisMonth)
-        assertEquals(SampleData.dailyWords.size, SampleData.monthTicks.size)
+    fun wordsInDropsStopwordsAndSingleCharacters() {
+        assertEquals(emptyList<String>(), wordsIn("le la de un et a y ? - !"))
+        assertEquals(listOf("Gradle", "konfig"), wordsIn("le Gradle ... konfig"))
+    }
+
+    @Test
+    fun wordsInKeepsOriginalCase() {
+        assertEquals(listOf("Voxkey", "voxkey", "VOXKEY"), wordsIn("Voxkey (voxkey) VOXKEY!"))
+    }
+
+    @Test
+    fun wordsInHandlesEmptyText() {
+        assertEquals(emptyList<String>(), wordsIn(""))
+        assertEquals(emptyList<String>(), wordsIn("   "))
+    }
+}
+
+/** Libellés de date des écrans (Stats.kt) : ajouté en fin de fichier. */
+class DayLabelTest {
+
+    private val today = java.time.LocalDate.of(2026, 11, 15)
+
+    @Test
+    fun dayLabelIsRelativeThenDated() {
+        assertEquals("Aujourd'hui", dayLabel(today, today))
+        assertEquals("Hier", dayLabel(today.minusDays(1), today))
+        assertEquals("9 novembre", dayLabel(java.time.LocalDate.of(2026, 11, 9), today))
+        assertEquals("31 décembre 2025", dayLabel(java.time.LocalDate.of(2025, 12, 31), today))
+    }
+
+    @Test
+    fun weekdayInitialStartsOnMonday() {
+        assertEquals("D", weekdayInitial(today))
+        assertEquals("L", weekdayInitial(today.plusDays(1)))
+        assertEquals("S", weekdayInitial(today.plusDays(6)))
+    }
+}
+
+class WordsLabelTest {
+
+    @Test
+    fun wordsLabelAgreesInFrench() {
+        assertEquals("0 mot", wordsLabel(0))
+        assertEquals("1 mot", wordsLabel(1))
+        assertEquals("2 mots", wordsLabel(2))
     }
 }

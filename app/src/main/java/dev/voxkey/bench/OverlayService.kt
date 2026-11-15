@@ -116,6 +116,11 @@ class OverlayService : Service() {
     /** Vrai après une perte de focus : Gboard se referme encore, on ne doit pas réafficher la bulle. */
     private var hiddenByFocus = false
     private var kbSeen = false
+    /** Libération différée du modèle : annulée dès qu'une nouvelle dictée commence. */
+    private val releaseModel = Runnable {
+        ParakeetEngine.release()
+        WhisperEngine.release()
+    }
     /** Dernière tentative de recréation de la fenêtre (anti-boucle). */
     private var lastReattachMs = 0L
 
@@ -143,6 +148,7 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Store.init(applicationContext)
         if (!isEnabled(this)) {
             stopSelf()
             return
@@ -358,7 +364,7 @@ class OverlayService : Service() {
         }
         main.removeCallbacksAndMessages(null)
         stopForeground(STOP_FOREGROUND_REMOVE)
-        main.postDelayed({ WhisperEngine.release() }, 1000)
+        main.postDelayed(releaseModel, 1000)
         super.onDestroy()
     }
 
@@ -546,6 +552,10 @@ class OverlayService : Service() {
         recorder = Recorder().also { it.start() }
         recording = true
 
+        // Le chargement (2 s pour parakeet q8) se fait pendant la dictée, plus au stop.
+        main.removeCallbacks(releaseModel)
+        preloadModel()
+
         key.background = keyBackground(active = true)
         keyView.active = true
         // le clavier peut s'être ouvert entre-temps : on se recale avant d'afficher le texte
@@ -557,6 +567,29 @@ class OverlayService : Service() {
     private fun cleanWhisper(text: String): String {
         if (ARTIFACTS.any { text.contains(it) }) return ""
         return text.replace(Regex("\\[[^\\]]*\\]|♪"), " ").replace(Regex("\\s+"), " ").trim()
+    }
+
+    /**
+     * Une abréviation dictée seule devient le texte complet enregistré pour ce mot-clé.
+     * Correspondance sur la dictée entière uniquement : « signature » est aussi un mot courant,
+     * l'étendre au milieu d'une phrase abîmerait le texte.
+     */
+    private fun expandKeywords(text: String): String {
+        if (text.isBlank()) return text
+        val bare = text.trim().trimEnd('.', '!', '?', ',', ';', ':', ' ').lowercase()
+        val hit = runCatching {
+            Store.keywords().firstOrNull { it.trigger.trim().lowercase() == bare }
+        }.getOrNull() ?: return text
+        Log.d("VXK", "keyword « ${hit.trigger} » → ${hit.replacement.length} chars")
+        return hit.replacement
+    }
+
+    /** Charge le modèle en tâche de fond : `ensure()` au stop le trouvera déjà prêt. */
+    private fun preloadModel() {
+        val model = selectedModelPath() ?: return
+        thread(name = "voxkey-load") {
+            if (isParakeetModel(model)) ParakeetEngine.ensure(model) else WhisperEngine.ensure(model)
+        }
     }
 
     private fun stopSession() {
@@ -578,8 +611,10 @@ class OverlayService : Service() {
                 val ready = if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
                 // porte de silence : sur du silence whisper hallucine ([Musique], sous-titres…)
                 if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && ready) {
-                    finalText = cleanWhisper(
-                        if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
+                    finalText = expandKeywords(
+                        cleanWhisper(
+                            if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
+                        )
                     )
                 }
                 Log.d("VXK", "final model=${model?.substringAfterLast('/')} parakeet=$parakeet ready=$ready pcm=${pcm.size} chars=${finalText.length}")
@@ -598,9 +633,10 @@ class OverlayService : Service() {
                     }
                     overlayStopForeground()
                     if (!VoxkeyAccessibilityService.hasTextField) root.visibility = View.GONE
-                    main.postDelayed({ if (parakeet) ParakeetEngine.release() else WhisperEngine.release() }, 60_000)
+                    main.postDelayed(releaseModel, 60_000)
                 }
             }
+            if (finalText.isNotBlank()) Store.addDictation(finalText)
         }
     }
 
@@ -634,7 +670,7 @@ class OverlayService : Service() {
             )
         }
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("voxkey")
+            .setContentTitle("MyWisper")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)

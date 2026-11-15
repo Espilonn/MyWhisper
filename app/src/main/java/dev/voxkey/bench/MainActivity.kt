@@ -6,9 +6,11 @@ import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Debug
+import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -17,31 +19,39 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
-import android.widget.Toast
 import org.json.JSONObject
 import java.io.File
 
 /**
  * Coquille à 5 onglets : Accueil, Réglages, Mots-clés, Historique, Dictionnaire.
- * L'onglet Réglages porte aussi le banc d'essai (modèle, threads, capture, transcription),
- * qui reste la seule façon de tester whisper.cpp depuis l'app.
+ * Au premier lancement, la mise en place n'est pas finie : on atterrit sur Réglages,
+ * qui sert d'écran de bienvenue.
+ *
+ * Le banc d'essai vit dans Réglages mais reste invisible par défaut : sept appuis sur
+ * « Version » le débloquent (préférence `bench_visible`). C'est l'outil qui mesure les
+ * modèles, pas une fonction de l'app.
  */
 class MainActivity : Activity() {
 
     private lateinit var ui: UiKit
-    private lateinit var home: HomeScreen
     private lateinit var settings: SettingsScreen
     private lateinit var content: FrameLayout
     private val screens = mutableListOf<View>()
+    private val refreshAll = mutableListOf<() -> Unit>()
     private val navIcons = mutableListOf<ImageView>()
     private val navLabels = mutableListOf<TextView>()
+    private val navPills = mutableListOf<FrameLayout>()
+    private var currentTab = 0
+    private val fMedium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val fSans = Typeface.create("sans-serif", Typeface.NORMAL)
 
-    // --- banc d'essai
+    // --- banc d'essai (construit seulement quand il est débloqué)
     private var handle = 0L
     private var loadedModel: String? = null
     private var pcm = FloatArray(0)
     private var durationSec = 10
     private var benchModel: File? = null
+    private var benchBuilt = false
 
     private lateinit var modelsBox: RadioGroup
     private lateinit var etThreads: EditText
@@ -53,11 +63,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Store.init(applicationContext)
         ui = UiKit(this)
-        window.statusBarColor = Ui.BG
-        window.navigationBarColor = Ui.BG
 
-        home = HomeScreen(this, ui, onOpenHistory = { select(3) }, onOpenSettings = { select(1) })
+        val home = HomeScreen(this, ui, onOpenHistory = { select(3) }, onOpenSettings = { select(1) })
         settings = SettingsScreen(this, ui)
         val keywords = KeywordsScreen(this, ui)
         val history = HistoryScreen(this, ui)
@@ -66,14 +75,21 @@ class MainActivity : Activity() {
         content = FrameLayout(this)
         screens += listOf(home.view, settings.view, keywords.view, history.view, dictionary.view)
         screens.forEach { content.addView(it, FrameLayout.LayoutParams(MATCH, MATCH)) }
+        refreshAll += listOf(home::refresh, settings::refresh, keywords::refresh, history::refresh, dictionary::refresh)
 
-        // Le banc d'essai vit dans l'onglet Réglages, sous les cartes de mise en place.
-        (settings.view.getChildAt(0) as LinearLayout).addFull(benchCard(), 16)
+        // Le banc n'est posé que si la préférence le demande : aucune trace au premier lancement.
+        settings.onBenchVisibilityChanged = { showBench(it) }
+        showBench(SettingsScreen.benchVisible(this))
 
+        // Un accent choisi dans Réglages repeint l'app entière, sans redémarrage.
+        settings.onAccentChanged = { restyle() }
+
+        // Barre d'onglets sur le fond de l'écran, détachée du contenu par un simple filet :
+        // pas de bloc opaque collé en bas.
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Ui.CARD)
-            setPadding(ui.dp(6), ui.dp(4), ui.dp(6), ui.dp(4))
+            setBackgroundColor(Ui.BG)
+            setPadding(ui.dp(8), ui.dp(6), ui.dp(8), ui.dp(6))
         }
         listOf(
             Triple(R.drawable.ic_nav_home, "Accueil", 0),
@@ -83,19 +99,37 @@ class MainActivity : Activity() {
             Triple(R.drawable.ic_nav_dictionary, "Dictionnaire", 4),
         ).forEach { (res, label, index) -> nav.addView(navItem(res, label, index)) }
 
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(View(this@MainActivity).apply { setBackgroundColor(Ui.LINE) },
+                LinearLayout.LayoutParams(MATCH, ui.dp(1)))
+            addView(nav, LinearLayout.LayoutParams(MATCH, WRAP))
+        }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Ui.BG)
             addView(content, LinearLayout.LayoutParams(MATCH, 0, 1f))
-            addView(nav, LinearLayout.LayoutParams(MATCH, WRAP))
+            addView(bar, LinearLayout.LayoutParams(MATCH, WRAP))
         }
         setContentView(root)
 
-        select(0)
+        // targetSdk 35 : la fenêtre va bord à bord. On écarte nous-mêmes le contenu de la
+        // barre d'état et la barre d'onglets du geste système.
+        edgeToEdge()
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val bars = insets.getInsets(WindowInsets.Type.systemBars())
+            root.setPadding(0, bars.top, 0, 0)
+            nav.setPadding(ui.dp(8), ui.dp(6), ui.dp(8), ui.dp(6) + bars.bottom)
+            insets
+        }
+
+        // Sans les trois droits, l'app ne peut pas dicter : l'écran de mise en place s'ouvre.
+        select(if (ready()) 0 else 1)
 
         // La bulle n'a pas besoin qu'on la lance à la main : elle vit tant que
         // la permission est là et que l'utilisateur ne l'a pas désactivée.
-        if (OverlayService.isEnabled(this) && android.provider.Settings.canDrawOverlays(this)) {
+        if (OverlayService.isEnabled(this) && Settings.canDrawOverlays(this)) {
             startService(Intent(this, OverlayService::class.java))
         }
 
@@ -108,8 +142,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        home.refresh()
-        settings.refresh()
+        // Une dictée a pu être enregistrée pendant que l'app était en arrière-plan.
+        refreshAll.forEach { it() }
     }
 
     override fun onDestroy() {
@@ -117,36 +151,77 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
+    /** Bord à bord : le fond de l'app passe sous les barres système, le contenu s'écarte tout seul. */
+    @Suppress("DEPRECATION")
+    private fun edgeToEdge() = window.setDecorFitsSystemWindows(false)
+
+    /** Nouvel accent : on reconstruit le contenu des cinq écrans et on repeint la barre. */
+    private fun restyle() {
+        refreshAll.forEach { it() }
+        select(currentTab)
+    }
+
+    private fun ready() =
+        Settings.canDrawOverlays(this) && SettingsScreen.isAccessibilityOn(this) && SettingsScreen.micGranted(this)
+
     // ------------------------------------------------------------------ onglets
 
+    /**
+     * Un onglet : la pastille d'état actif derrière l'icône, le libellé dessous.
+     * Cible tactile de toute la largeur du cinquième, 56 dp de haut.
+     */
     private fun navItem(res: Int, label: String, index: Int): LinearLayout {
         val icon = ui.icon(res, Ui.MUTED, 22)
-        val text = ui.text(label, 10f, Ui.MUTED).apply { gravity = Gravity.CENTER }
+        val pill = FrameLayout(this).apply {
+            background = null
+            layoutParams = LinearLayout.LayoutParams(ui.dp(56), ui.dp(32))
+            addView(icon, FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER))
+        }
+        val text = ui.micro(label).apply {
+            gravity = Gravity.CENTER
+            maxLines = 1
+        }
         navIcons += icon
         navLabels += text
+        navPills += pill
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(0, ui.dp(9), 0, ui.dp(7))
+            setPadding(0, ui.dp(6), 0, ui.dp(6))
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            addView(icon)
-            addView(text, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = ui.dp(3) })
+            addView(pill)
+            addView(text, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = ui.dp(4) })
             setOnClickListener { select(index) }
         }
     }
 
     private fun select(index: Int) {
+        currentTab = index
         screens.forEachIndexed { i, v -> v.visibility = if (i == index) View.VISIBLE else View.GONE }
+        navPills.forEachIndexed { i, pill ->
+            pill.background = if (i == index) ui.rounded(Ui.ACCENT_BG, 99) else null
+        }
         navIcons.forEachIndexed { i, icon ->
             icon.setColorFilter(if (i == index) Ui.ACCENT else Ui.MUTED)
         }
         navLabels.forEachIndexed { i, label ->
             label.setTextColor(if (i == index) Ui.INK else Ui.MUTED)
-            label.typeface = if (i == index) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            label.typeface = if (i == index) fMedium else fSans
         }
+        // Un ajout ou une suppression sur un autre onglet doit se voir en revenant.
+        refreshAll.getOrNull(index)?.invoke()
     }
 
-    // ---------------------------------------------------------------- banc
+    // ------------------------------------------------------------- banc d'essai
+
+    /** Pose la carte au bas de Réglages la première fois, puis la montre ou la cache. */
+    private fun showBench(on: Boolean) {
+        if (on && !benchBuilt) {
+            settings.benchSlot.addFull(benchCard(), 16)
+            benchBuilt = true
+        }
+        settings.benchSlot.visibility = if (on) View.VISIBLE else View.GONE
+    }
 
     /** Carte du banc d'essai : modèle, threads, durée, capture/WAV, transcription, métriques. */
     private fun benchCard(): View {
@@ -193,8 +268,6 @@ class MainActivity : Activity() {
         return card
     }
 
-    // ---------------------------------------------------------------- modèles
-
     /** Le banc liste les modèles là où l'app les cherche : racine des fichiers + ancien sous-dossier models/. */
     private fun modelFiles(): List<File> {
         val root = getExternalFilesDir(null) ?: return emptyList()
@@ -218,6 +291,7 @@ class MainActivity : Activity() {
                 id = View.generateViewId()
                 text = "${f.name}  (${"%.1f".format(f.length() / 1e6)} Mo)"
                 setTextColor(Ui.INK)
+                setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT))
                 tag = f
             }
             modelsBox.addView(rb)

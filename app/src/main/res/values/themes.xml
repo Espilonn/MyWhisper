@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Thème unique volontairement sombre : la bulle de dictée, l'icône et toute l'interface
+      partagent la même matière. On prend donc la variante sombre de DeviceDefault (sans
+      DayNight) pour que les widgets système (Spinner, RadioButton, dialogues) restent
+      lisibles même quand le téléphone est en thème clair. Sans barre d'action : les écrans
+      dessinent leur propre en-tête.
+    -->
+    <style name="MyWisper" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/app_bg</item>
+        <item name="android:statusBarColor">@color/app_bg</item>
+        <item name="android:navigationBarColor">@color/app_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">@color/app_accent</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

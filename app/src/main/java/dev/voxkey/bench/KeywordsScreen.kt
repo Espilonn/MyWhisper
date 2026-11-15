@@ -1,78 +1,114 @@
 package dev.voxkey.bench
 
 import android.app.Activity
-import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Toast
 
-/** Mots-clés : une abréviation tapée, un texte complet écrit, présenté comme des modèles d'e-mail. */
+/**
+ * Mots-clés : une abréviation tapée pendant la dictée, un texte complet écrit à la place.
+ * Ajouter, modifier et supprimer passent par le Store.
+ */
 class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
 
-    val view: ScrollView
+    private val page = ui.page(
+        title = "Mots-clés",
+        subtitle = "Une abréviation tapée, un texte complet écrit.",
+        trailing = ui.iconButton(R.drawable.ic_add, "Ajouter un mot-clé") { edit(null) }.also { addButton = it },
+    )
+    private lateinit var addButton: View
+    private val body = page.body
+    val view = page.root
 
     init {
-        val titles = LinearLayout(act).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(ui.text("Mots-clés", 26f, Ui.INK, bold = true))
-            addView(ui.text("Une abréviation tapée, un texte complet écrit.", 14f, Ui.MUTED))
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        val add = ui.text("+", 24f, Ui.ON_ACCENT, bold = true).apply {
-            gravity = Gravity.CENTER
-            background = ui.rounded(Ui.ACCENT, 22)
-            layoutParams = LinearLayout.LayoutParams(ui.dp(44), ui.dp(44))
-            setOnClickListener { notReady() }
-        }
-        val header = LinearLayout(act).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(titles)
-            addView(add)
-        }
-
-        val list = ui.card()
-        list.addView(ui.sectionTitle(R.drawable.ic_nav_keywords, "Modèles"))
-        SampleData.keywords.forEach { list.addFull(keywordRow(it), 12) }
-
-        val content = LinearLayout(act).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(ui.dp(20), ui.dp(28), ui.dp(20), ui.dp(24))
-            addView(header)
-            addFull(ui.sampleTag(), 14)
-            addFull(ui.text("Pas encore branché à la dictée.", 13f, Ui.MUTED), 8)
-            addFull(list, 18)
-        }
-        view = ScrollView(act).apply { addView(content) }
+        refresh()
     }
 
-    private fun keywordRow(k: SampleData.Keyword) = LinearLayout(act).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        background = ui.rounded(Ui.BG, 16)
-        setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14))
-        addView(ui.text(k.trigger.first().uppercase(), 16f, Ui.ACCENT, bold = true).apply {
+    fun refresh() {
+        ui.retintIconButton(addButton)
+        render()
+    }
+
+    private fun render() {
+        body.removeAllViews()
+        val keywords = Store.keywords()
+        if (keywords.isEmpty()) {
+            body.addView(
+                ui.empty(
+                    R.drawable.ic_nav_keywords,
+                    "Aucun mot-clé",
+                    "Dis « mail merci » et MyWisper écrira ta formule de politesse en entier.",
+                    action = "Créer un mot-clé",
+                    onAction = { edit(null) },
+                ),
+                LinearLayout.LayoutParams(MATCH, 0, 1f),
+            )
+            return
+        }
+        body.addView(ui.meta(if (keywords.size == 1) "1 mot-clé" else "${keywords.size} mots-clés"))
+        val card = ui.card()
+        keywords.forEachIndexed { i, k ->
+            if (i > 0) card.addRule()
+            card.addView(keywordRow(k))
+        }
+        body.addFull(card, 10)
+        body.addFull(
+            ui.meta(
+                "Appuie sur un mot-clé pour le modifier. Le déclencheur n'est remplacé que " +
+                    "lorsque tu dictes ce mot seul.",
+            ),
+            12,
+        )
+    }
+
+    private fun keywordRow(k: Keyword) = ui.listRow(
+        title = k.trigger,
+        subtitle = k.replacement,
+        lead = ui.heading((k.trigger.firstOrNull()?.uppercase() ?: "?"), Ui.ACCENT).apply {
             gravity = Gravity.CENTER
-            background = ui.rounded(Ui.CARD_HI, 20)
+            background = ui.rounded(Ui.CARD_HI, 99, Ui.LINE)
             layoutParams = LinearLayout.LayoutParams(ui.dp(40), ui.dp(40))
-        })
-        addView(LinearLayout(act).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(ui.dp(12), 0, ui.dp(8), 0)
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            addView(ui.text("« ${k.trigger} »", 15f, Ui.INK, bold = true))
-            addView(ui.text(k.replacement, 13f, Ui.MUTED).apply {
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, ui.dp(2), 0, 0)
-            })
-        })
-        addView(ui.pill(k.tag, Ui.MUTED, Ui.LINE))
-        setOnClickListener { notReady() }
+        },
+        glyphIcon = R.drawable.ic_delete,
+        glyphDesc = "Supprimer « ${k.trigger} »",
+        onOpen = { edit(k) },
+        onGlyph = { confirmDelete(k) },
+    )
+
+    private fun edit(existing: Keyword?) {
+        ui.prompt(
+            title = if (existing == null) "Nouveau mot-clé" else "Modifier le mot-clé",
+            subtitle = "Tapé seul pendant la dictée, le déclencheur est remplacé par le texte.",
+            fields = listOf(
+                UiKit.Field("Déclencheur", hint = "Ex. : mail merci", initial = existing?.trigger.orEmpty()),
+                UiKit.Field("Texte écrit à la place", hint = "Merci beaucoup pour ton retour…", initial = existing?.replacement.orEmpty(), lines = 3),
+            ),
+            confirm = if (existing == null) "Ajouter" else "Enregistrer",
+        ) { values ->
+            val trigger = values[0]
+            val replacement = values.getOrElse(1) { "" }
+            if (trigger.isEmpty()) {
+                false
+            } else {
+                // Le déclencheur identifie le mot-clé : s'il change, l'ancien doit partir.
+                if (existing != null && existing.trigger != trigger) Store.deleteKeyword(existing.id)
+                Store.saveKeyword(trigger, replacement)
+                render()
+                true
+            }
+        }
     }
 
-    private fun notReady() {
-        Toast.makeText(act, "Mots-clés : pas encore disponibles", Toast.LENGTH_SHORT).show()
+    private fun confirmDelete(k: Keyword) {
+        ui.confirm(
+            title = "Supprimer « ${k.trigger} » ?",
+            message = "Le raccourci disparaît ; le texte ne sera plus écrit à ta place.",
+            confirmLabel = "Supprimer",
+            destructive = true,
+            onConfirm = {
+                Store.deleteKeyword(k.id)
+                render()
+            },
+        )
     }
 }

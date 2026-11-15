@@ -20,8 +20,6 @@ import android.view.animation.LinearInterpolator
 class WaveBarsView(context: Context) : View(context) {
 
     private companion object {
-        const val ACCENT = 0xFFFFD400.toInt()
-        const val ACCENT_TOP = 0xFFFFEE8A.toInt()
         const val IDLE = 0xFF8F97A6.toInt()
         const val IDLE_TOP = 0xFFBFC6D2.toInt()
         const val PERIOD_MS = 1150L
@@ -36,6 +34,13 @@ class WaveBarsView(context: Context) : View(context) {
     private var anim: ValueAnimator? = null
     private var shaderForActive = false
     private var shader: Shader? = null
+    private var shaderAccent = 0
+
+    /**
+     * L'accent est relu à chaque dessin : la bulle peut rester ouverte pendant que
+     * l'utilisateur change la couleur de l'app, la dictée suivante suit le nouveau choix.
+     */
+    private fun accent(): Int = Accent.current(context)
 
     var active = false
         set(on) {
@@ -94,12 +99,14 @@ class WaveBarsView(context: Context) : View(context) {
         val minH = h * 0.24f
 
         val lit = active || busy
-        if (shader == null || shaderForActive != lit) {
+        val accent = accent()
+        if (shader == null || shaderForActive != lit || shaderAccent != accent) {
             shaderForActive = lit
+            shaderAccent = accent
             shader = LinearGradient(
                 0f, (h - maxH) / 2f, 0f, (h + maxH) / 2f,
-                if (lit) ACCENT_TOP else IDLE_TOP,
-                if (lit) ACCENT else IDLE,
+                if (lit) Accent.light(accent) else IDLE_TOP,
+                if (lit) accent else IDLE,
                 Shader.TileMode.CLAMP
             )
         }
