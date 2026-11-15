@@ -5,7 +5,6 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import java.time.LocalDate
 import kotlin.math.abs
 
@@ -25,13 +24,18 @@ class HomeScreen(
         title = "MyWisper",
         subtitle = "Ta dictée, sur le téléphone",
         trailing = status,
-        scroll = false,
     )
     private val body = page.body
     val view = page.root
 
-    /** Fenêtre du graphique : false = 30 jours, true = 7 jours. */
-    private var week = false
+    /** Fenêtre du graphique : 0 = semaine, 1 = mois, 2 = six mois. */
+    private var span = 1
+
+    private val dayCount get() = when (span) {
+        0 -> 7
+        1 -> 30
+        else -> 180
+    }
 
     init {
         status.setOnClickListener { onOpenSettings() }
@@ -56,7 +60,7 @@ class HomeScreen(
 
     private fun render() {
         body.removeAllViews()
-        val days = if (week) 7 else 30
+        val days = dayCount
         val series = Store.wordsPerDay(days)
         val total = series.sum()
         val dayMs = 86_400_000L
@@ -64,12 +68,18 @@ class HomeScreen(
         val previous = Store.totalWordsSince(now - 2L * days * dayMs) - Store.totalWordsSince(now - days * dayMs)
 
         if (Store.dictationCount() == 0) {
-            body.addView(onboarding(), LinearLayout.LayoutParams(MATCH, 0, 1f))
+            body.center(onboarding())
             return
         }
 
         val hero = ui.card()
-        hero.addView(ui.label("Mots dictés"))
+        // Intitulé et fenêtre sur la même ligne : le nombre et la grille gagnent la place.
+        hero.addView(LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ui.label("Mots dictés"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.meta(spanLabel()))
+        })
         val figure = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.BOTTOM
@@ -89,13 +99,10 @@ class HomeScreen(
             }
         }
         hero.addView(figure, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(8) })
-        hero.addView(ui.meta("sur $days jours · ${formatCount(previous)} sur les $days jours d'avant").apply {
-            setPadding(0, ui.dp(4), 0, 0)
-        })
-        hero.addView(ui.segmented(listOf("Semaine", "Mois"), if (week) 0 else 1) { i ->
-            week = i == 0
+        hero.addView(ui.segmented(listOf("Semaine", "Mois", "6 mois"), span) { i ->
+            span = i
             render()
-        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(18) })
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(14) })
 
         // Un carré par jour : la grille se lit comme celle des contributions GitHub.
         val today = LocalDate.now()
@@ -103,52 +110,42 @@ class HomeScreen(
             DayGrid.Day(today.minusDays((days - 1 - i).toLong()), v)
         }
         val grid = DayGrid(act).apply {
-            setData(cells, week)
+            setData(cells, span)
             selectLast()
         }
-        hero.addView(grid, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(18) })
-
         // Détail du jour choisi (aujourd'hui au départ), plus la légende d'intensité.
         val caption = ui.micro(dayDetail(cells.last()), Ui.MUTED)
         grid.onPick = { day -> caption.text = dayDetail(day) }
-        val foot = LinearLayout(act).apply {
+
+        hero.addView(grid, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
+        hero.addView(LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(caption, LinearLayout.LayoutParams(0, WRAP, 1f))
-            addView(legend())
-        }
-        hero.addView(foot, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(12) })
+            addView(legend(), LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = ui.dp(16) })
+        }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
 
-        hero.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         body.addView(hero)
 
-        body.addView(journal(), LinearLayout.LayoutParams(MATCH, 0, 1f).apply { topMargin = ui.dp(16) })
+        body.addView(journal(), LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
     }
 
-    /** Aucune dictée : l'écran entier devient une invitation, centrée, sans trou. */
-    private fun onboarding(): LinearLayout = ui.card(26).apply {
-        gravity = Gravity.CENTER
-        addView(ui.icon(R.drawable.ic_words, Ui.ACCENT, 26).apply {
-            background = ui.rounded(Ui.ACCENT_BG, 99)
-            setPadding(ui.dp(16), ui.dp(16), ui.dp(16), ui.dp(16))
-            layoutParams = LinearLayout.LayoutParams(ui.dp(58), ui.dp(58))
-        })
-        addView(ui.heading("Aucun mot pour l'instant").apply {
-            gravity = Gravity.CENTER
-            setPadding(0, ui.dp(20), 0, 0)
-        })
-        addView(ui.body(
-            "Ouvre un champ de texte, puis appuie sur la touche de dictée en bas du clavier. " +
-                "Tes mots s'afficheront ici, jour après jour.",
-        ).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, ui.dp(10), 0, 0)
-        })
-        if (!ready()) {
-            addView(ui.button("Mettre en place", primary = true) { onOpenSettings() },
-                LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(24) })
-        }
+    /** « sur 7 jours », « sur 30 jours », « sur 6 mois » : la fenêtre lue sous le grand nombre. */
+    private fun spanLabel() = when (span) {
+        0 -> "sur 7 jours"
+        1 -> "sur 30 jours"
+        else -> "sur 6 mois"
     }
+
+    /** Aucune dictée : une seule invitation, au milieu de l'écran. */
+    private fun onboarding() = ui.empty(
+        R.drawable.ic_words,
+        "Aucun mot pour l'instant",
+        "Ouvre un champ de texte, puis appuie sur la touche de dictée en bas du clavier. " +
+            "Tes mots s'afficheront ici, jour après jour.",
+        action = if (ready()) null else "Mettre en place",
+        onAction = { onOpenSettings() },
+    )
 
     /** « Aujourd'hui · 30 mots », le détail d'un carré touché. */
     private fun dayDetail(day: DayGrid.Day): String {
@@ -176,35 +173,42 @@ class HomeScreen(
         addView(ui.micro("plus").apply { setPadding(ui.dp(3), 0, 0, 0) })
     }
 
-    /** Dernières dictées : la carte prend la hauteur libre, la liste défile à l'intérieur. */
+    /**
+     * Dernières dictées : les plus récentes, puis le lien vers l'historique. La carte s'ajuste à
+     * son contenu : elle affiche autant de lignes que la vue en laisse la place (quatre, deux
+     * dans la vue Mois dont la grille est haute), et s'arrête sur la dernière — jamais de zone
+     * vide sous la dernière ligne, jamais de ligne coupée en deux.
+     */
     private fun journal(): LinearLayout {
         val card = ui.card()
-        card.addView(ui.label("Dernières dictées"))
-        val list = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
-        val last = Store.dictations().take(6)
+        card.addView(LinearLayout(act).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ui.label("Dernières dictées"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.link("Tout voir →") { onOpenHistory() })
+        })
+        // Autant de dictées que la vue en laisse la place : la grille de six mois prend plus
+        // de hauteur que celle de la semaine, celle du mois plus encore.
+        val room = when (span) {
+            DayGrid.MONTH -> 1
+            DayGrid.DENSE -> 3
+            else -> 4
+        }
+        val last = Store.dictations().take(room)
         if (last.isEmpty()) {
-            list.addView(ui.empty(
-                R.drawable.ic_nav_history,
-                "Rien pour l'instant",
-                "Ta première dictée s'affichera ici, avec l'heure et le nombre de mots.",
-            ), LinearLayout.LayoutParams(MATCH, 0, 1f))
+            card.addView(ui.meta("Tes dictées s'afficheront ici.").apply {
+                gravity = Gravity.CENTER
+                setPadding(0, ui.dp(24), 0, ui.dp(24))
+            })
         } else {
             last.forEachIndexed { i, d ->
-                if (i > 0) list.addRule()
-                list.addFull(ui.listRow(
+                if (i > 0) card.addRule()
+                card.addFull(ui.listRow(
                     title = d.text,
-                    over = relativeStamp(d.ts),
-                    badge = ui.pill(wordsLabel(d.words), Ui.MUTED, Ui.CARD_HI),
+                    over = "${relativeStamp(d.ts)} · ${wordsLabel(d.words)}",
                 ))
             }
         }
-        card.addView(ScrollView(act).apply {
-            isFillViewport = true
-            overScrollMode = ScrollView.OVER_SCROLL_NEVER
-            addView(list, LinearLayout.LayoutParams(MATCH, WRAP))
-        }, LinearLayout.LayoutParams(MATCH, 0, 1f).apply { topMargin = ui.dp(4) })
-        card.addRule(4)
-        card.addFull(ui.textButton("Tout l'historique  →") { onOpenHistory() })
         return card
     }
 

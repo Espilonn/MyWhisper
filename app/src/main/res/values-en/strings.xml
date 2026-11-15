@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyWisper</string>
+    <string name="a11y_desc">Lets MyWisper type your dictation into the active field.</string>
+    <string name="a11y_dictate">Dictate</string>
+    <string name="notif_channel_name">Dictation</string>
+    <string name="notif_dictating">Dictating…</string>
+</resources>

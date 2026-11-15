@@ -33,7 +33,7 @@ class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
         body.removeAllViews()
         val keywords = Store.keywords()
         if (keywords.isEmpty()) {
-            body.addView(
+            body.center(
                 ui.empty(
                     R.drawable.ic_nav_keywords,
                     "Aucun mot-clé",
@@ -41,11 +41,10 @@ class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
                     action = "Créer un mot-clé",
                     onAction = { edit(null) },
                 ),
-                LinearLayout.LayoutParams(MATCH, 0, 1f),
             )
             return
         }
-        body.addView(ui.meta(if (keywords.size == 1) "1 mot-clé" else "${keywords.size} mots-clés"))
+        body.addFull(ui.section("Mes mots-clés", if (keywords.size == 1) "1 mot-clé" else "${keywords.size} mots-clés"))
         val card = ui.card()
         keywords.forEachIndexed { i, k ->
             if (i > 0) card.addRule()

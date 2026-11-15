@@ -8,27 +8,28 @@ import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
 import java.time.LocalDate
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Grille de contributions façon GitHub : un carré par jour, un écart régulier entre les
- * carrés, et une intensité qui dit le nombre de mots du jour.
+ * Grille de jours : un carré par jour, intensité = mots dictés, appui = détail du jour.
  *
- * Mois : sept lignes (lundi en haut), une colonne par semaine, initiales du jour à gauche.
- * Semaine : une seule ligne de sept carrés plus grands, initiales en dessous.
+ * Deux dispositions, selon la fenêtre montrée :
+ *  · [WEEK] et [MONTH] — sept colonnes de jours (lundi à gauche), initiales au-dessus, une
+ *    ligne par semaine : une semaine se lit d'un trait, un mois tient en cinq lignes ;
+ *  · [DENSE] — la même grille couchée : une colonne par semaine, une ligne par jour, carrés
+ *    minuscules. Cent quatre-vingts jours en sept colonnes feraient vingt-six lignes, un mur
+ *    qui ne tient pas dans une carte ; couchée, la bande tient en une centaine de dp.
  *
- * Pas de survol sur mobile : un appui sur un carré choisit le jour, l'écran affiche son détail.
+ * La largeur disponible est toujours remplie : le côté du carré s'en déduit, avec un plafond
+ * pour ne pas devenir énorme sur une tablette.
  */
 class DayGrid(context: Context) : View(context) {
 
     class Day(val date: LocalDate, val words: Int)
 
     private val density = resources.displayMetrics.density
-    private val gap = 4f * density
-    private val cellMonth = 22f * density
-    private val cellWeek = 34f * density
-    private val labelW = 18f * density
-    private val labelH = 20f * density
+    private val labelH = 18f * density
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -45,10 +46,13 @@ class DayGrid(context: Context) : View(context) {
     private val rect = RectF()
 
     private var days: List<Day> = emptyList()
-    private var slots = IntArray(0)
-    private var byWeek = false
-    private var cols = 1
-    private var max_words = 0
+    /** Colonne et ligne de chaque jour, dans l'ordre de [days]. */
+    private var cols = IntArray(0)
+    private var rows = IntArray(0)
+    private var colCount = 1
+    private var rowCount = 1
+    private var mode = MONTH
+    private var maxWords = 0
     private var selected = -1
 
     /** Appelé quand on appuie sur un carré. */
@@ -57,26 +61,29 @@ class DayGrid(context: Context) : View(context) {
     /** Une seule source de vérité pour l'intensité : cinq tons, du jour vide au jour plein. */
     private val ramp get() = Accent.ramp()
 
+    private val dense get() = mode == DENSE
+    private val turned get() = dense
+    private val gap get() = (if (dense) 2 else 4) * density
+
     /**
      * [list] va du plus ancien au plus récent ; l'appelant fournit les dates, la vue n'en
      * invente aucune.
      */
-    fun setData(list: List<Day>, weekMode: Boolean) {
+    fun setData(list: List<Day>, mode: Int) {
         days = list
-        byWeek = weekMode
-        max_words = list.maxOfOrNull { it.words } ?: 0
-        if (list.isEmpty()) {
-            slots = IntArray(0)
-            cols = 1
-        } else if (weekMode) {
-            cols = 7
-            slots = IntArray(list.size) { list[it].date.dayOfWeek.value - 1 }
-        } else {
-            // Décalage du premier jour dans sa semaine : la première colonne est partielle.
-            val offset = list.first().date.dayOfWeek.value - 1
-            cols = (offset + list.size + 6) / 7
-            slots = IntArray(list.size) { (offset + it) / 7 }
+        this.mode = mode
+        maxWords = list.maxOfOrNull { it.words } ?: 0
+        cols = IntArray(list.size)
+        rows = IntArray(list.size)
+        // Décalage du premier jour dans sa semaine : la première ligne est partielle.
+        val offset = if (list.isEmpty()) 0 else list.first().date.dayOfWeek.value - 1
+        list.forEachIndexed { i, day ->
+            val weekday = day.date.dayOfWeek.value - 1
+            cols[i] = if (turned) (offset + i) / 7 else weekday
+            rows[i] = if (turned) weekday else (offset + i) / 7
         }
+        colCount = (cols.maxOrNull() ?: 0) + 1
+        rowCount = (rows.maxOrNull() ?: 0) + 1
         selected = -1
         contentDescription = "Activité de la dictée sur ${list.size} jours"
         requestLayout()
@@ -90,77 +97,89 @@ class DayGrid(context: Context) : View(context) {
     }
 
     private fun level(words: Int): Int = when {
-        words <= 0 || max_words <= 0 -> 0
-        else -> (words * 4.0 / max_words).toInt().coerceIn(1, 4)
+        words <= 0 || maxWords <= 0 -> 0
+        else -> (words * 4.0 / maxWords).toInt().coerceIn(1, 4)
     }
 
-    private val cell get() = if (byWeek) cellWeek else cellMonth
+    /** Marge réservée au contour de sélection, qui déborde de 2 dp, plus un peu d'air. */
+    private val pad = 6f * density
+
+    /** Côté du carré : la grille remplit la largeur, plafonnée selon la disposition. */
+    private fun cell(width: Int): Float {
+        val cap = when (mode) {
+            DENSE -> 14f
+            WEEK -> 44f
+            else -> 56f
+        } * density
+        return min((width - 2 * pad - (colCount - 1) * gap) / colCount, cap)
+    }
+
+    private fun left(c: Float): Float =
+        pad + (width - 2 * pad - (colCount * c + (colCount - 1) * gap)) / 2f
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        val h = if (byWeek) cell + gap + labelH else 7 * cell + 6 * gap
-        setMeasuredDimension(width, h.roundToInt())
-    }
-
-    /** Coin gauche du bloc (initiales comprises), centré dans la largeur disponible. */
-    private fun blockLeft(): Float {
-        val blockW = if (byWeek) 0f else labelW
-        val gridW = cols * cell + (cols - 1) * gap
-        return (width - blockW - gridW) / 2f + blockW
+        val c = cell(width)
+        val labels = if (turned) 0f else labelH
+        setMeasuredDimension(
+            width,
+            (labels + 2 * pad + rowCount * c + (rowCount - 1) * gap).roundToInt(),
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
         if (days.isEmpty()) return
-        val cell = cell
-        val left = blockLeft()
-        val radius = cell * 0.22f
+        val c = cell(width)
+        val x0 = left(c)
+        val radius = c * 0.22f
+        val top = if (turned) pad else labelH + pad
         // Quatre tons calculés une fois par dessin, pas par carré.
         val tones = ramp
 
-        if (!byWeek) {
-            // Initiales des jours à gauche, une par ligne.
-            "LMMJVSD".forEachIndexed { row, c ->
-                val y = row * (cell + gap) + cell / 2f - (text.descent() + text.ascent()) / 2f
-                canvas.drawText(c.toString(), left - labelW / 2f, y, text)
+        // Initiales des jours au-dessus des sept colonnes (semaine et mois seulement).
+        if (!turned) {
+            val middle = (text.descent() + text.ascent()) / 2f
+            "LMMJVSD".forEachIndexed { col, initial ->
+                canvas.drawText(initial.toString(), x0 + col * (c + gap) + c / 2f, pad + labelH / 2f - middle, text)
             }
         }
 
-        slots.forEachIndexed { i, col ->
-            val row = if (byWeek) 0 else days[i].date.dayOfWeek.value - 1
-            val x = left + col * (cell + gap)
-            val y = row * (cell + gap)
-            rect.set(x, y, x + cell, y + cell)
-            val level = level(days[i].words)
+        days.forEachIndexed { i, day ->
+            val x = x0 + cols[i] * (c + gap)
+            val y = top + rows[i] * (c + gap)
+            rect.set(x, y, x + c, y + c)
+            val level = level(day.words)
             fill.color = if (level == 0) Ui.OFF else tones[level - 1]
             canvas.drawRoundRect(rect, radius, radius, fill)
             if (i == selected) {
                 rect.inset(-2f * density, -2f * density)
                 canvas.drawRoundRect(rect, radius + 2f * density, radius + 2f * density, ring)
             }
-            if (byWeek) {
-                val cx = x + cell / 2f
-                val cy = y + cell + gap + labelH / 2f - (text.descent() + text.ascent()) / 2f
-                canvas.drawText(weekdayInitial(days[i].date), cx, cy, text)
-            }
         }
     }
 
+    /** Un appui choisit le carré le plus proche : la cible reste confortable même en six mois. */
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (days.isEmpty()) return false
         if (event.actionMasked != MotionEvent.ACTION_DOWN) return true
-        val cell = cell
-        val left = blockLeft()
-        slots.forEachIndexed { i, col ->
-            val row = if (byWeek) 0 else days[i].date.dayOfWeek.value - 1
-            val x = left + col * (cell + gap)
-            val y = row * (cell + gap)
-            if (event.x >= x && event.x <= x + cell && event.y >= y && event.y <= y + cell) {
-                selected = i
-                invalidate()
-                onPick?.invoke(days[i])
-                return true
-            }
-        }
+        val c = cell(width)
+        val pitch = c + gap
+        val top = if (turned) pad else labelH + pad
+        val col = ((event.x - left(c)) / pitch).roundToInt()
+        val row = ((event.y - top) / pitch).roundToInt()
+        val picked = days.indices.firstOrNull { cols[it] == col && rows[it] == row } ?: return true
+        selected = picked
+        invalidate()
+        onPick?.invoke(days[picked])
         return true
+    }
+
+    companion object {
+        /** Sept jours sur une ligne (Semaine). */
+        const val WEEK = 0
+        /** Sept colonnes de jours, une ligne par semaine (Mois). */
+        const val MONTH = 1
+        /** Grille couchée, carrés minuscules (six mois). */
+        const val DENSE = 2
     }
 }

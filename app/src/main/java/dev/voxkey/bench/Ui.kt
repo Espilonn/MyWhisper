@@ -62,6 +62,14 @@ fun LinearLayout.addFull(v: View, topDp: Int = 0) {
     addView(v, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = (topDp * d).toInt() })
 }
 
+/** Pose une ou plusieurs vues au milieu de l'espace libre : deux ressorts autour. */
+fun LinearLayout.center(vararg v: View) {
+    fun spring() = addView(View(context), LinearLayout.LayoutParams(MATCH, 0, 1f))
+    spring()
+    v.forEach { addView(it, LinearLayout.LayoutParams(MATCH, WRAP)) }
+    spring()
+}
+
 /** Filet de séparation de 1 dp, à l'intérieur d'une carte. */
 fun LinearLayout.addRule(topDp: Int = 0) {
     val d = context.resources.displayMetrics.density
@@ -167,7 +175,7 @@ class UiKit(private val ctx: Context) {
         val head = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(14))
+            setPadding(dp(20), dp(18), dp(20), dp(14))
             addView(LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(this@UiKit.title(title))
@@ -181,7 +189,7 @@ class UiKit(private val ctx: Context) {
         }
         val body = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), 0, dp(20), dp(16))
+            setPadding(dp(20), dp(6), dp(20), dp(18))
         }
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -256,9 +264,9 @@ class UiKit(private val ctx: Context) {
     }
 
     /**
-     * Ligne de liste : texte principal, éventuellement une ligne au-dessus (heure), un
-     * sous-titre, un signe de tête à gauche, une pastille et une action à droite.
-     * L'action est une cible tactile de 44 dp, distincte du clic sur la ligne.
+     * Ligne de liste : texte principal, éventuellement une ligne au-dessus (heure, compte),
+     * un sous-titre, un signe de tête à gauche et une action à droite. L'action est une cible
+     * tactile de 44 dp, distincte du clic sur la ligne.
      * Les lignes s'empilent directement dans une carte, séparées par [addRule].
      */
     fun listRow(
@@ -266,7 +274,6 @@ class UiKit(private val ctx: Context) {
         over: String? = null,
         subtitle: String? = null,
         lead: View? = null,
-        badge: View? = null,
         glyphIcon: Int? = null,
         glyphDesc: String? = null,
         onOpen: (() -> Unit)? = null,
@@ -305,22 +312,27 @@ class UiKit(private val ctx: Context) {
             }
         })
 
-        badge?.let {
-            addView(it, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(10) })
-        }
         glyphIcon?.let {
             addView(icon(it, Ui.MUTED, 20).apply {
                 contentDescription = glyphDesc
                 background = tappable(0, 99)
                 setPadding(dp(12), dp(12), dp(12), dp(12))
-                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { leftMargin = dp(2) }
+                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { leftMargin = dp(6) }
                 setOnClickListener { onGlyph?.invoke() }
             })
         }
     }
 
-    /** État vide : icône, phrase d'explication, action facultative. Sans surface, il se pose
-     *  aussi bien sur le fond d'écran que dans une carte. */
+    /** Interligne de section : un intitulé à gauche, un compte à droite. */
+    fun section(title: String, count: String? = null) = LinearLayout(ctx).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(heading(title), LinearLayout.LayoutParams(0, WRAP, 1f))
+        count?.let { addView(meta(it)) }
+    }
+
+    /** État vide : une carte posée au milieu de l'écran (voir [center]), icône accentuée,
+     *  phrase d'explication, action facultative. Jamais un texte gris perdu sur le fond. */
     fun empty(
         res: Int,
         title: String,
@@ -330,7 +342,8 @@ class UiKit(private val ctx: Context) {
     ) = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        setPadding(dp(12), dp(24), dp(12), dp(24))
+        background = rounded(Ui.CARD, 20)
+        setPadding(dp(22), dp(28), dp(22), dp(26))
         addView(icon(res, Ui.ACCENT, 24).apply {
             background = rounded(Ui.ACCENT_BG, 99)
             setPadding(dp(16), dp(16), dp(16), dp(16))
@@ -346,7 +359,7 @@ class UiKit(private val ctx: Context) {
         })
         if (action != null) {
             addView(button(action, primary = true) { onAction?.invoke() },
-                LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(22) })
+                LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(22) })
         }
     }
 
@@ -373,11 +386,12 @@ class UiKit(private val ctx: Context) {
         setOnClickListener { onClick() }
     }
 
-    /** Action discrète en pied de carte : « Tout l'historique → ». */
-    fun textButton(label: String, onClick: () -> Unit) = text(label, 14f, Ui.ACCENT).apply {
+    /** Lien d'en-tête de carte : « Tout voir → », texte accent, cible de 44 dp. */
+    fun link(label: String, onClick: () -> Unit) = text(label, 13f, Ui.ACCENT).apply {
         typeface = medium
         gravity = Gravity.CENTER_VERTICAL
-        minHeight = dp(48)
+        setPadding(dp(12), 0, 0, 0)
+        minHeight = dp(44)
         setOnClickListener { onClick() }
     }
 

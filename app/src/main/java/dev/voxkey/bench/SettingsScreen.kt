@@ -239,28 +239,33 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         modelRefresh.setTextColor(Ui.ACCENT)
     }
 
-    /** Les cinq accents proposés ; celui qui est actif porte un anneau. */
+    /** Les cinq accents proposés, répartis sur la largeur ; l'accent actif porte une coche
+     *  (un anneau clair se perdrait sur le jaune). */
     private fun renderAccents() {
         accentName.text = Accent.name()
         accentRow.removeAllViews()
         Accent.palette.forEach { (name, color) ->
             val on = Accent.current() == color
             accentRow.addView(FrameLayout(act).apply {
-                contentDescription = "Accent $name"
-                background = swatch(color, on)
-                layoutParams = LinearLayout.LayoutParams(ui.dp(44), ui.dp(44)).apply {
-                    rightMargin = ui.dp(12)
-                }
+                contentDescription = "Accent $name" + if (on) ", choisi" else ""
+                layoutParams = LinearLayout.LayoutParams(0, ui.dp(48), 1f)
                 setOnClickListener { pickAccent(color) }
+                addView(FrameLayout(act).apply {
+                    background = swatch(color)
+                    layoutParams = FrameLayout.LayoutParams(ui.dp(44), ui.dp(44), Gravity.CENTER)
+                    if (on) addView(ui.text("✓", 17f, Accent.on(color)).apply {
+                        gravity = Gravity.CENTER
+                    }, FrameLayout.LayoutParams(MATCH, MATCH))
+                })
             })
         }
     }
 
-    private fun swatch(color: Int, selected: Boolean): android.graphics.drawable.Drawable {
+    private fun swatch(color: Int): android.graphics.drawable.Drawable {
         val tv = android.util.TypedValue()
         val found = act.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
         val ripple = if (found && tv.resourceId != 0) act.getDrawable(tv.resourceId) else null
-        val base = ui.rounded(color, 99, if (selected) Ui.INK else null)
+        val base = ui.rounded(color, 99)
         if (ripple == null) return base
         return android.graphics.drawable.LayerDrawable(arrayOf(base, ripple))
     }
@@ -307,7 +312,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
         val labels = LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
-            addView(ui.heading(s.title))
+            addView(ui.text(s.title, 15f, Ui.INK, bold = true))
             addView(s.status, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(3) })
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = ui.dp(14) }
         }
@@ -325,7 +330,9 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         }
     }
 
-    /** Pastille (numéro ou coche) par étape ; le bouton n'est affiché que pour la prochaine étape. */
+    /** Pastille (numéro ou coche) par étape ; le bouton n'est affiché que pour la prochaine étape.
+     *  Étape faite : accent en texte sur pastille teintée. Étape en cours : aplat d'accent plein,
+     *  pour les distinguer sans sortir de la palette. */
     private fun refreshState() {
         val done = steps.map { it.isDone() }
         val current = done.indexOf(false)
@@ -336,21 +343,21 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             s.badge.text = if (isDone) "✓" else "${s.number}"
             s.badge.setTextColor(
                 when {
-                    isDone -> Ui.GOOD
+                    isDone -> Ui.ACCENT
                     isCurrent -> Ui.ON_ACCENT
                     else -> Ui.MUTED
                 }
             )
             s.badge.background = ui.rounded(
                 when {
-                    isDone -> Ui.GOOD_BG
+                    isDone -> Ui.ACCENT_BG
                     isCurrent -> Ui.ACCENT
                     else -> Ui.CARD_HI
                 },
                 99,
             )
             s.status.text = if (isDone) s.doneText else s.hint
-            s.status.setTextColor(if (isDone) Ui.GOOD else Ui.MUTED)
+            s.status.setTextColor(if (isDone) Ui.ACCENT else Ui.MUTED)
             // Le bouton inverse d'une étape faite est un réglage, pas une permission : discret.
             if (s.altLabel != null) s.button.text = if (isDone) s.altLabel else s.buttonLabel
             s.button.background = ui.tappable(if (isDone && s.altLabel != null) Ui.CARD_HI else Ui.ACCENT, 16)

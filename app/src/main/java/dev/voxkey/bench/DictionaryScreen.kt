@@ -3,6 +3,7 @@ package dev.voxkey.bench
 import android.app.Activity
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
 import android.widget.LinearLayout
 
 /**
@@ -14,15 +15,21 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
 
     private val search = ui.input("Rechercher dans mes mots")
     private val count = ui.meta("")
+    private val section = android.widget.LinearLayout(act).apply {
+        orientation = android.widget.LinearLayout.HORIZONTAL
+        gravity = android.view.Gravity.CENTER_VERTICAL
+        addView(ui.heading("Mes mots"), android.widget.LinearLayout.LayoutParams(0, WRAP, 1f))
+        addView(count)
+    }
     private val list = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
-    /** État vide : posé à même la page pour qu'il occupe la hauteur libre. */
-    private var filler: android.view.View? = null
+    /** Emplacement de l'état vide : occupe la hauteur libre, sans déplacer la recherche. */
+    private val emptyBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
     private val page = ui.page(
         title = "Dictionnaire",
-        subtitle = "Les noms propres, marques et termes techniques que la dictée doit écrire juste.",
+        subtitle = "Tes noms propres et tes marques, gardés à part.",
         trailing = ui.iconButton(R.drawable.ic_add, "Ajouter un mot") { addWord() }.also { addButton = it },
     )
-    private lateinit var addButton: android.view.View
+    private lateinit var addButton: View
     private val body = page.body
     val view = page.root
 
@@ -33,8 +40,9 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
             override fun afterTextChanged(s: Editable?) = render()
         })
         body.addView(search)
-        body.addView(count, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(14) })
-        body.addView(list, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(10) })
+        body.addView(section, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
+        body.addView(list, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(6) })
+        body.addView(emptyBox, LinearLayout.LayoutParams(MATCH, 0, 1f))
         refresh()
     }
 
@@ -44,9 +52,9 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
     }
 
     private fun render() {
-        filler?.let { body.removeView(it) }
-        filler = null
         list.removeAllViews()
+        emptyBox.removeAllViews()
+        emptyBox.visibility = View.GONE
         val query = search.text.toString()
         val hits = Store.words(query)
         val total = Store.words().size
@@ -56,13 +64,18 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
             hits.isEmpty() -> ""
             else -> "${hits.size} sur $total"
         }
+        count.visibility = if (count.text.isEmpty()) View.GONE else View.VISIBLE
+        // Sans aucun mot, la recherche et l'intitulé de section n'ont rien à interroger ;
+        // sans résultat, l'état vide dit tout.
+        search.visibility = if (total == 0) View.GONE else View.VISIBLE
+        section.visibility = if (hits.isEmpty()) View.GONE else View.VISIBLE
         if (hits.isEmpty()) {
-            val view = if (total == 0) {
+            val empty = if (total == 0) {
                 ui.empty(
                     R.drawable.ic_nav_dictionary,
                     "Ta liste est vide",
-                    "Ajoute les mots que la dictée écorche : un prénom, une marque, " +
-                        "un terme de métier. Ils restent sur ce téléphone.",
+                    "Garde ici les prénoms, les marques et les termes de métier que tu veux " +
+                        "retrouver. Rien ne quitte ce téléphone.",
                     action = "Ajouter un mot",
                     onAction = { addWord() },
                 )
@@ -73,8 +86,8 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
                     "Rien ne correspond à « ${query.trim()} ».",
                 )
             }
-            body.addView(view, LinearLayout.LayoutParams(MATCH, 0, 1f))
-            filler = view
+            emptyBox.center(empty)
+            emptyBox.visibility = View.VISIBLE
             return
         }
         val card = ui.card()
@@ -108,7 +121,7 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
     private fun addWord() {
         ui.prompt(
             title = "Ajouter un mot",
-            subtitle = "Un prénom, une marque, un terme que la dictée doit écrire juste.",
+            subtitle = "Un prénom, une marque, un terme que tu veux garder tel quel.",
             fields = listOf(UiKit.Field("Mot", hint = "Ex. : Voxkey")),
             confirm = "Ajouter",
         ) { values ->

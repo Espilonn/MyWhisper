@@ -382,7 +382,7 @@ class OverlayService : Service() {
         keyView = WaveBarsView(this)
 
         key = FrameLayout(this).apply {
-            contentDescription = "Dicter"
+            contentDescription = getString(R.string.a11y_dictate)
             isClickable = true
             background = keyBackground(active = false)
             foreground = RippleDrawable(
@@ -545,7 +545,7 @@ class OverlayService : Service() {
         pushed = ""
 
         startForeground(
-            NOTIF_ID, notification("Dictée en cours…"),
+            NOTIF_ID, notification(getString(R.string.notif_dictating)),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         )
 
@@ -666,11 +666,11 @@ class OverlayService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL_ID) == null) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Dictée", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CHANNEL_ID, getString(R.string.notif_channel_name), NotificationManager.IMPORTANCE_LOW)
             )
         }
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("MyWisper")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)
