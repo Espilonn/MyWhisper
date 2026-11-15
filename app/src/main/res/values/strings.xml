@@ -1,8 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Textes communs : identité de l'app, bulle, notifications, vocabulaire partagé
+    par plusieurs écrans. Chaque écran ajoute ses propres clés dans son fichier
+    (strings_<écran>.xml), en français ici et en anglais dans values-en/.
+-->
 <resources>
     <string name="app_name">MyWisper</string>
     <string name="a11y_desc">Permet à MyWisper d\u2019écrire le texte dicté dans le champ actif.</string>
     <string name="a11y_dictate">Dicter</string>
     <string name="notif_channel_name">Dictée</string>
     <string name="notif_dictating">Dictée en cours…</string>
+
+    <!-- Vocabulaire partagé -->
+    <string name="today">Aujourd\'hui</string>
+    <string name="yesterday">Hier</string>
+    <string name="cancel">Annuler</string>
+    <string name="save">Enregistrer</string>
+    <string name="delete">Supprimer</string>
+    <string name="megabytes">%s Mo</string>
+    <string name="weekday_initials">LMMJVSD</string>
+
+    <!-- Comptes -->
+    <plurals name="words">
+        <item quantity="one">%s mot</item>
+        <item quantity="other">%s mots</item>
+    </plurals>
 </resources>

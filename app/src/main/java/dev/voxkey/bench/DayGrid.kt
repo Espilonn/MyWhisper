@@ -45,6 +45,9 @@ class DayGrid(context: Context) : View(context) {
     }
     private val rect = RectF()
 
+    /** Initiales des jours dans la langue du téléphone : « LMMJVSD » ou « MTWTFSS ». */
+    private val initials = resources.getString(R.string.weekday_initials)
+
     private var days: List<Day> = emptyList()
     /** Colonne et ligne de chaque jour, dans l'ordre de [days]. */
     private var cols = IntArray(0)
@@ -85,7 +88,7 @@ class DayGrid(context: Context) : View(context) {
         colCount = (cols.maxOrNull() ?: 0) + 1
         rowCount = (rows.maxOrNull() ?: 0) + 1
         selected = -1
-        contentDescription = "Activité de la dictée sur ${list.size} jours"
+        contentDescription = resources.getString(R.string.home_activity_desc, list.size)
         requestLayout()
         invalidate()
     }
@@ -139,7 +142,7 @@ class DayGrid(context: Context) : View(context) {
         // Initiales des jours au-dessus des sept colonnes (semaine et mois seulement).
         if (!turned) {
             val middle = (text.descent() + text.ascent()) / 2f
-            "LMMJVSD".forEachIndexed { col, initial ->
+            initials.forEachIndexed { col, initial ->
                 canvas.drawText(initial.toString(), x0 + col * (c + gap) + c / 2f, pad + labelH / 2f - middle, text)
             }
         }

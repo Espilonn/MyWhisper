@@ -69,24 +69,25 @@ class DayLabelTest {
     fun dayLabelIsRelativeThenDated() {
         assertEquals("Aujourd'hui", dayLabel(today, today))
         assertEquals("Hier", dayLabel(today.minusDays(1), today))
-        assertEquals("9 novembre", dayLabel(java.time.LocalDate.of(2026, 11, 9), today))
-        assertEquals("31 décembre 2025", dayLabel(java.time.LocalDate.of(2025, 12, 31), today))
+        assertEquals(
+            "9 novembre",
+            dayLabel(java.time.LocalDate.of(2026, 11, 9), today, locale = java.util.Locale.FRENCH),
+        )
+        assertEquals(
+            "31 décembre 2025",
+            dayLabel(java.time.LocalDate.of(2025, 12, 31), today, locale = java.util.Locale.FRENCH),
+        )
     }
 
     @Test
-    fun weekdayInitialStartsOnMonday() {
-        assertEquals("D", weekdayInitial(today))
-        assertEquals("L", weekdayInitial(today.plusDays(1)))
-        assertEquals("S", weekdayInitial(today.plusDays(6)))
-    }
-}
-
-class WordsLabelTest {
-
-    @Test
-    fun wordsLabelAgreesInFrench() {
-        assertEquals("0 mot", wordsLabel(0))
-        assertEquals("1 mot", wordsLabel(1))
-        assertEquals("2 mots", wordsLabel(2))
+    fun dayLabelFollowsThePhoneLanguage() {
+        assertEquals(
+            "9 November",
+            dayLabel(java.time.LocalDate.of(2026, 11, 9), today, locale = java.util.Locale.ENGLISH),
+        )
+        assertEquals(
+            "Today",
+            dayLabel(today, today, todayLabel = "Today", yesterdayLabel = "Yesterday"),
+        )
     }
 }

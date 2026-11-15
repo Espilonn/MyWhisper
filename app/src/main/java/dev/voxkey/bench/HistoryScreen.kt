@@ -2,13 +2,14 @@ package dev.voxkey.bench
 
 import android.app.Activity
 import android.widget.LinearLayout
+import java.time.LocalDate
 
 /** Historique : les dictées enregistrées, groupées par jour, avec suppression. */
 class HistoryScreen(private val act: Activity, private val ui: UiKit) {
 
     private val page = ui.page(
-        title = "Historique",
-        subtitle = "De la plus récente à la plus ancienne.",
+        title = ui.t(R.string.history_title),
+        subtitle = ui.t(R.string.history_subtitle),
     )
     private val body = page.body
     val view = page.root
@@ -22,9 +23,8 @@ class HistoryScreen(private val act: Activity, private val ui: UiKit) {
             body.center(
                 ui.empty(
                     R.drawable.ic_nav_history,
-                    "Aucune dictée",
-                    "Chaque texte dicté est gardé ici. Ouvre un champ de texte, puis appuie sur " +
-                        "la touche de dictée.",
+                    ui.t(R.string.history_empty_title),
+                    ui.t(R.string.history_empty_body),
                 ),
             )
             return
@@ -33,8 +33,13 @@ class HistoryScreen(private val act: Activity, private val ui: UiKit) {
         all.groupBy { dayKey(it.ts) }.forEach { (_, items) ->
             body.addFull(
                 ui.section(
-                    dayLabel(dayOf(items.first().ts)),
-                    if (items.size == 1) "1 dictée" else "${items.size} dictées",
+                    dayLabel(
+                        dayOf(items.first().ts),
+                        LocalDate.now(),
+                        ui.t(R.string.today),
+                        ui.t(R.string.yesterday),
+                    ),
+                    ui.q(R.plurals.history_dictations, items.size),
                 ),
                 if (body.childCount == 0) 0 else 24,
             )
@@ -49,18 +54,18 @@ class HistoryScreen(private val act: Activity, private val ui: UiKit) {
 
     private fun dictationRow(d: Dictation) = ui.listRow(
         title = d.text,
-        over = "${timeLabel(d.ts)} · ${wordsLabel(d.words)}",
+        over = ui.t(R.string.history_row_meta, timeLabel(d.ts), ui.q(R.plurals.words, d.words)),
         glyphIcon = R.drawable.ic_delete,
-        glyphDesc = "Supprimer cette dictée",
+        glyphDesc = ui.t(R.string.history_delete_desc),
         onGlyph = { confirmDelete(d) },
     )
 
     /** La suppression est définitive : on demande confirmation avant d'effacer. */
     private fun confirmDelete(d: Dictation) {
         ui.confirm(
-            title = "Supprimer cette dictée ?",
-            message = "« ${shorten(d.text)} » sera effacée pour de bon.",
-            confirmLabel = "Supprimer",
+            title = ui.t(R.string.history_delete_title),
+            message = ui.t(R.string.history_delete_message, shorten(d.text)),
+            confirmLabel = ui.t(R.string.delete),
             destructive = true,
             onConfirm = {
                 Store.deleteDictation(d.id)

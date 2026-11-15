@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translation of values/strings_words.xml. Same keys, same order. -->
+<resources>
+    <!-- Keywords -->
+    <string name="keywords_title">Keywords</string>
+    <string name="keywords_subtitle">An abbreviation you type, a full text written in its place.</string>
+    <string name="keywords_add">Add a keyword</string>
+    <string name="keywords_empty_title">No keywords</string>
+    <string name="keywords_empty_body">Say “mail thanks” and MyWisper will write your full sign-off.</string>
+    <string name="keywords_empty_action">Create a keyword</string>
+    <string name="keywords_section">My keywords</string>
+    <plurals name="keywords_count">
+        <item quantity="one">%s keyword</item>
+        <item quantity="other">%s keywords</item>
+    </plurals>
+    <string name="keywords_tip">Tap a keyword to edit it. The trigger is only replaced when you dictate that word on its own.</string>
+    <string name="keywords_new">New keyword</string>
+    <string name="keywords_edit">Edit keyword</string>
+    <string name="keywords_prompt_subtitle">Typed on its own during dictation, the trigger is replaced by the text.</string>
+    <string name="keywords_trigger">Trigger</string>
+    <string name="keywords_trigger_hint">E.g. mail thanks</string>
+    <string name="keywords_text">Text written instead</string>
+    <string name="keywords_text_hint">Thanks a lot for your feedback…</string>
+    <string name="keywords_add_confirm">Add</string>
+    <string name="keywords_delete_title">Delete “%1$s”?</string>
+    <string name="keywords_delete_desc">Delete “%1$s”</string>
+    <string name="keywords_delete_message">The shortcut disappears; the text will no longer be written for you.</string>
+    <string name="keywords_initial">?</string>
+
+    <!-- Dictionary -->
+    <string name="dictionary_title">Dictionary</string>
+    <string name="dictionary_subtitle">Your proper nouns and brands, kept separate.</string>
+    <string name="dictionary_add">Add a word</string>
+    <string name="dictionary_add_confirm">Add</string>
+    <string name="dictionary_search">Search my words</string>
+    <string name="dictionary_section">My words</string>
+    <string name="dictionary_count">%1$d of %2$d</string>
+    <string name="dictionary_empty_search_title">No words found</string>
+    <string name="dictionary_empty_search_body">Nothing matches “%1$s”.</string>
+    <string name="dictionary_empty_title">Your list is empty</string>
+    <string name="dictionary_empty_body">Keep the first names, brands and technical terms you want to find again here. Nothing leaves this phone.</string>
+    <string name="dictionary_delete_message">The word will be removed from your list.</string>
+    <string name="dictionary_prompt_subtitle">A first name, a brand, a term you want to keep as it is.</string>
+    <string name="dictionary_field_word">Word</string>
+    <string name="dictionary_field_hint">E.g. Voxkey</string>
+    <string name="dictionary_delete_title">Delete “%1$s”?</string>
+    <string name="dictionary_delete_desc">Delete “%1$s”</string>
+</resources>

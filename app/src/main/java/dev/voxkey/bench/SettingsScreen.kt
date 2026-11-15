@@ -74,7 +74,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
     private var versionTaps = 0
 
-    private val page = ui.page("Réglages", "Droits, modèle et fonctionnement de la dictée.")
+    private val page = ui.page(ui.t(R.string.settings_title), ui.t(R.string.settings_desc))
     private val content = page.body
 
     private lateinit var modelSpinner: Spinner
@@ -94,39 +94,39 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
 
     init {
         steps += Step(
-            1, "Superposition",
-            hint = "Affiche la touche par-dessus les autres applis.",
-            doneText = "Autorisée",
-            buttonLabel = "Autoriser la superposition",
+            1, ui.t(R.string.settings_step_overlay),
+            hint = ui.t(R.string.settings_step_overlay_hint),
+            doneText = ui.t(R.string.settings_step_overlay_done),
+            buttonLabel = ui.t(R.string.settings_step_overlay_action),
             isDone = { Settings.canDrawOverlays(act) },
             onAction = {
                 act.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${act.packageName}")))
             },
         )
         steps += Step(
-            2, "Accessibilité",
-            hint = "Écrit le texte dicté dans le champ actif.",
-            doneText = "Activée",
-            buttonLabel = "Ouvrir les réglages d'accessibilité",
+            2, ui.t(R.string.settings_step_a11y),
+            hint = ui.t(R.string.settings_step_a11y_hint),
+            doneText = ui.t(R.string.settings_step_a11y_done),
+            buttonLabel = ui.t(R.string.settings_step_a11y_action),
             isDone = { isAccessibilityOn(act) },
             onAction = { act.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
         )
         steps += Step(
-            3, "Micro",
-            hint = "Enregistre ta voix pendant la dictée.",
-            doneText = "Autorisé",
-            buttonLabel = "Autoriser le micro",
+            3, ui.t(R.string.settings_step_mic),
+            hint = ui.t(R.string.settings_step_mic_hint),
+            doneText = ui.t(R.string.settings_step_mic_done),
+            buttonLabel = ui.t(R.string.settings_step_mic_action),
             isDone = { micGranted(act) },
             onAction = { act.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1) },
         )
         steps += Step(
-            4, "Touche de dictée",
-            hint = "Apparaît en bas à gauche du clavier.",
-            doneText = "Active",
-            buttonLabel = "Activer la touche de dictée",
+            4, ui.t(R.string.settings_step_key),
+            hint = ui.t(R.string.settings_step_key_hint),
+            doneText = ui.t(R.string.settings_step_key_done),
+            buttonLabel = ui.t(R.string.settings_step_key_action),
             isDone = { OverlayService.isEnabled(act) },
             onAction = { setBubble(true) },
-            altLabel = "Désactiver la touche de dictée",
+            altLabel = ui.t(R.string.settings_step_key_off_action),
             altAction = { setBubble(false) },
             alwaysShowButton = true,
         )
@@ -135,7 +135,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val setupHead = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(ui.label("Mise en place"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.label(ui.t(R.string.settings_setup)), LinearLayout.LayoutParams(0, WRAP, 1f))
             setupProgress = ui.meta("")
             addView(setupProgress)
         }
@@ -151,7 +151,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val themeHead = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(ui.label("Apparence"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.label(ui.t(R.string.settings_appearance)), LinearLayout.LayoutParams(0, WRAP, 1f))
             accentName = ui.meta("")
             addView(accentName)
         }
@@ -161,7 +161,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             gravity = Gravity.CENTER_VERTICAL
         }
         theme.addView(accentRow, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(16) })
-        theme.addView(ui.meta("La couleur des boutons, de la pastille active et de la bulle.").apply {
+        theme.addView(ui.meta(ui.t(R.string.settings_appearance_hint)).apply {
             setPadding(0, ui.dp(14), 0, 0)
         })
         content.addFull(theme, 16)
@@ -170,8 +170,8 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val modelHead = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(ui.label("Modèle de reconnaissance"), LinearLayout.LayoutParams(0, WRAP, 1f))
-            addView(ui.text("Rafraîchir", 13f, Ui.ACCENT).apply {
+            addView(ui.label(ui.t(R.string.settings_model)), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.text(ui.t(R.string.settings_refresh), 13f, Ui.ACCENT).apply {
                 modelRefresh = this
                 typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
                 setPadding(ui.dp(10), ui.dp(10), 0, ui.dp(10))
@@ -198,7 +198,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         }
         model.addFull(modelField, 10)
         modelEmpty = ui.meta(
-            "Aucun modèle trouvé. Ajoute un fichier de modèle (.bin ou .gguf) à l'app, puis appuie sur Rafraîchir.",
+            ui.t(R.string.settings_model_empty),
         )
         model.addFull(modelEmpty, 8)
         downloadBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
@@ -208,21 +208,21 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         content.addFull(model, 16)
 
         val dictation = ui.card()
-        dictation.addView(ui.label("Dictée"))
+        dictation.addView(ui.label(ui.t(R.string.settings_dictation)))
         listOf(
-            "Langue" to "Français",
-            "Commande" to "Appui pour dicter, appui pour arrêter",
-            "Transcription" to "Sur le téléphone",
-            "Pour dicter" to "Ouvre un champ de texte : la touche apparaît en bas à gauche du clavier.",
+            R.string.settings_language to R.string.settings_language_fr,
+            R.string.settings_command to R.string.settings_command_value,
+            R.string.settings_transcription to R.string.settings_on_device,
+            R.string.settings_how_to_dictate to R.string.settings_how_to_dictate_value,
         ).forEachIndexed { i, (label, value) ->
             if (i > 0) dictation.addRule()
-            dictation.addView(ui.row(label, value))
+            dictation.addView(ui.row(ui.t(label), ui.t(value)))
         }
         content.addFull(dictation, 16)
 
         val about = ui.card()
-        about.addView(ui.label("À propos"))
-        about.addView(ui.row("Version", appVersion()).apply {
+        about.addView(ui.label(ui.t(R.string.settings_about)))
+        about.addView(ui.row(ui.t(R.string.settings_version), appVersion()).apply {
             setOnClickListener { countVersionTap() }
         })
         content.addFull(about, 16)
@@ -242,12 +242,13 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     /** Les cinq accents proposés, répartis sur la largeur ; l'accent actif porte une coche
      *  (un anneau clair se perdrait sur le jaune). */
     private fun renderAccents() {
-        accentName.text = Accent.name()
+        accentName.text = ui.t(R.string.settings_accent_named, ui.t(Accent.nameRes()))
         accentRow.removeAllViews()
         Accent.palette.forEach { (name, color) ->
             val on = Accent.current() == color
             accentRow.addView(FrameLayout(act).apply {
-                contentDescription = "Accent $name" + if (on) ", choisi" else ""
+                contentDescription = ui.t(R.string.settings_accent_named, ui.t(name)) +
+                    if (on) ui.t(R.string.settings_accent_chosen) else ""
                 layoutParams = LinearLayout.LayoutParams(0, ui.dp(48), 1f)
                 setOnClickListener { pickAccent(color) }
                 addView(FrameLayout(act).apply {
@@ -290,14 +291,15 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             .edit().putBoolean(BENCH_VISIBLE, on).apply()
         Toast.makeText(
             act,
-            if (on) "Banc d'essai activé" else "Banc d'essai masqué",
+            if (on) ui.t(R.string.settings_bench_on) else ui.t(R.string.settings_bench_off),
             Toast.LENGTH_SHORT,
         ).show()
         onBenchVisibilityChanged?.invoke(on)
     }
 
     private fun appVersion(): String =
-        act.packageManager.getPackageInfo(act.packageName, 0).versionName ?: "inconnue"
+        act.packageManager.getPackageInfo(act.packageName, 0).versionName
+            ?: ui.t(R.string.settings_version_unknown)
 
     private fun stepRow(s: Step): View {
         s.badge = ui.text("", 13f, Ui.INK).apply {
@@ -336,7 +338,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private fun refreshState() {
         val done = steps.map { it.isDone() }
         val current = done.indexOf(false)
-        setupProgress.text = "${done.count { it }} sur ${steps.size}"
+        setupProgress.text = ui.t(R.string.settings_progress, done.count { it }, steps.size)
         steps.forEachIndexed { i, s ->
             val isDone = done[i]
             val isCurrent = i == current
@@ -373,7 +375,9 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             ?.sortedBy { it.length() }
             ?: emptyList()
 
-        modelSpinner.adapter = object : ArrayAdapter<String>(act, 0, files.map { "${it.name} (${it.length() / 1_048_576} Mo)" }) {
+        modelSpinner.adapter = object : ArrayAdapter<String>(act, 0, files.map {
+            ui.t(R.string.settings_model_file, it.name, ui.t(R.string.megabytes, it.length() / 1_048_576))
+        }) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
                 ui.body(getItem(position).orEmpty(), Ui.INK).apply {
                     typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
@@ -424,13 +428,16 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         downloadBox.removeAllViews()
         val missing = ModelCatalog.all.filter { it.file !in present }
         if (missing.isEmpty()) {
-            downloadBox.addFull(ui.meta("Tous les modèles proposés sont installés."), 6)
+            downloadBox.addFull(ui.meta(ui.t(R.string.settings_models_installed)), 6)
             return
         }
-        downloadBox.addFull(ui.label("Télécharger un modèle"), 16)
+        downloadBox.addFull(ui.label(ui.t(R.string.settings_download_title)), 16)
         for (m in missing) {
-            downloadBox.addFull(ui.meta("${m.label} · ${m.mo} Mo"), 10)
-            val b = ui.button("Télécharger", primary = false) { startDownload(m) }
+            downloadBox.addFull(
+                ui.meta(ui.t(R.string.settings_model_line, ui.t(m.labelRes), ui.t(R.string.megabytes, m.mo))),
+                10,
+            )
+            val b = ui.button(ui.t(R.string.settings_download_action), primary = false) { startDownload(m) }
             b.isEnabled = !downloading
             b.alpha = if (downloading) 0.4f else 1f
             downloadBox.addFull(b, 8)
@@ -440,20 +447,30 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private fun startDownload(m: ModelCatalog.Remote) {
         val dir = act.getExternalFilesDir(null)
         if (dir == null) {
-            Toast.makeText(act, "Stockage indisponible", Toast.LENGTH_SHORT).show()
+            Toast.makeText(act, ui.t(R.string.settings_storage_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
         downloading = true
-        downloadStatus.text = "${m.label} : connexion…"
+        downloadStatus.text = ui.t(R.string.settings_download_connecting, ui.t(m.labelRes))
         refreshModels()
         ModelCatalog.download(
-            m.file, dir,
+            act, m.file, dir,
             onProgress = { done, total ->
                 act.runOnUiThread {
                     downloadStatus.text = if (total > 0) {
-                        "${m.label} : ${done * 100 / total} % (${done / 1_048_576} / ${m.mo} Mo)"
+                        ui.t(
+                            R.string.settings_download_percent,
+                            ui.t(m.labelRes),
+                            done * 100 / total,
+                            ui.t(R.string.megabytes, done / 1_048_576),
+                            ui.t(R.string.megabytes, m.mo),
+                        )
                     } else {
-                        "${m.label} : ${done / 1_048_576} Mo"
+                        ui.t(
+                            R.string.settings_download_size,
+                            ui.t(m.labelRes),
+                            ui.t(R.string.megabytes, done / 1_048_576),
+                        )
                     }
                 }
             },
@@ -462,16 +479,16 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
                     downloading = false
                     act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
                         .edit().putString("model", m.file).apply()
-                    downloadStatus.text = "${m.label} : installé et sélectionné."
-                    Toast.makeText(act, "Modèle prêt", Toast.LENGTH_SHORT).show()
+                    downloadStatus.text = ui.t(R.string.settings_download_done, ui.t(m.labelRes))
+                    Toast.makeText(act, ui.t(R.string.settings_model_ready), Toast.LENGTH_SHORT).show()
                     refreshModels()
                 }
             },
             onError = { msg ->
                 act.runOnUiThread {
                     downloading = false
-                    downloadStatus.text = "Échec du téléchargement : $msg"
-                    Toast.makeText(act, "Échec : $msg", Toast.LENGTH_LONG).show()
+                    downloadStatus.text = ui.t(R.string.settings_download_failed, msg)
+                    Toast.makeText(act, ui.t(R.string.settings_failed, msg), Toast.LENGTH_LONG).show()
                     refreshModels()
                 }
             },
@@ -481,13 +498,13 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     /** Active ou coupe la bulle (préférence lue aussi au démarrage du service et de l'accessibilité). */
     private fun setBubble(on: Boolean) {
         if (on && !isAccessibilityOn(act) && !Settings.canDrawOverlays(act)) {
-            Toast.makeText(act, "Autorise d'abord la superposition", Toast.LENGTH_SHORT).show()
+            Toast.makeText(act, ui.t(R.string.settings_overlay_first), Toast.LENGTH_SHORT).show()
             return
         }
         OverlayService.setEnabled(act, on)
         Toast.makeText(
             act,
-            if (on) "Touche de dictée activée" else "Touche de dictée désactivée",
+            if (on) ui.t(R.string.settings_key_on) else ui.t(R.string.settings_key_off),
             Toast.LENGTH_SHORT,
         ).show()
         refreshState()

@@ -99,6 +99,12 @@ class UiKit(private val ctx: Context) {
 
     fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
 
+    /** Texte venu des ressources : seul point d'entrée des libellés de l'interface. */
+    fun t(res: Int, vararg args: Any) = ctx.getString(res, *args)
+
+    /** Pluriel accordé par la langue du téléphone (« 1 mot », « 3 mots ») ; le nombre garde son séparateur de milliers. */
+    fun q(res: Int, n: Int) = ctx.resources.getQuantityString(res, n, formatCount(n))
+
     fun rounded(color: Int, radiusDp: Int, strokeColor: Int? = null) = GradientDrawable().apply {
         setColor(color)
         cornerRadius = dp(radiusDp).toFloat()
@@ -487,7 +493,7 @@ class UiKit(private val ctx: Context) {
     ) = LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
-        addView(button("Annuler", primary = false) { d.dismiss() },
+        addView(button(t(R.string.cancel), primary = false) { d.dismiss() },
             LinearLayout.LayoutParams(WRAP, WRAP))
         addView(buttonStyled(confirmLabel, textColor, bg) {
             // Une saisie refusée garde la boîte ouverte : rien ne se perd en silence.
@@ -500,7 +506,7 @@ class UiKit(private val ctx: Context) {
         title: String,
         subtitle: String? = null,
         fields: List<Field>,
-        confirm: String = "Enregistrer",
+        confirm: String = t(R.string.save),
         onSubmit: (List<String>) -> Boolean,
     ) {
         val d = dialog()

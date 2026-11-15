@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Textes de Réglages, du catalogue de modèles, des accents, des onglets et du banc
+    d'essai. Mêmes clés, même ordre dans values-en/strings_settings.xml.
+-->
+<resources>
+
+    <!-- Réglages : en-tête et mise en place -->
+    <string name="settings_title">Réglages</string>
+    <string name="settings_desc">Droits, modèle et fonctionnement de la dictée.</string>
+    <string name="settings_setup">Mise en place</string>
+    <string name="settings_progress">%1$d sur %2$d</string>
+
+    <string name="settings_step_overlay">Superposition</string>
+    <string name="settings_step_overlay_hint">Affiche la touche par-dessus les autres applis.</string>
+    <string name="settings_step_overlay_done">Autorisée</string>
+    <string name="settings_step_overlay_action">Autoriser la superposition</string>
+    <string name="settings_overlay_first">Autorise d\'abord la superposition</string>
+
+    <string name="settings_step_a11y">Accessibilité</string>
+    <string name="settings_step_a11y_hint">Écrit le texte dicté dans le champ actif.</string>
+    <string name="settings_step_a11y_done">Activée</string>
+    <string name="settings_step_a11y_action">Ouvrir les réglages d\'accessibilité</string>
+
+    <string name="settings_step_mic">Micro</string>
+    <string name="settings_step_mic_hint">Enregistre ta voix pendant la dictée.</string>
+    <string name="settings_step_mic_done">Autorisé</string>
+    <string name="settings_step_mic_action">Autoriser le micro</string>
+
+    <string name="settings_step_key">Touche de dictée</string>
+    <string name="settings_step_key_hint">Apparaît en bas à gauche du clavier.</string>
+    <string name="settings_step_key_done">Active</string>
+    <string name="settings_step_key_action">Activer la touche de dictée</string>
+    <string name="settings_step_key_off_action">Désactiver la touche de dictée</string>
+    <string name="settings_key_on">Touche de dictée activée</string>
+    <string name="settings_key_off">Touche de dictée désactivée</string>
+
+    <!-- Apparence -->
+    <string name="settings_appearance">Apparence</string>
+    <string name="settings_appearance_hint">La couleur des boutons, de la pastille active et de la bulle.</string>
+    <string name="settings_accent_named">Accent %s</string>
+    <string name="settings_accent_chosen">, choisi</string>
+
+    <!-- Accents du thème -->
+    <string name="accent_yellow">Jaune</string>
+    <string name="accent_blue">Bleu</string>
+    <string name="accent_green">Vert</string>
+    <string name="accent_purple">Violet</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_custom">Personnalisé</string>
+
+    <!-- Modèle de reconnaissance -->
+    <string name="settings_model">Modèle de reconnaissance</string>
+    <string name="settings_refresh">Rafraîchir</string>
+    <string name="settings_model_empty">Aucun modèle trouvé. Ajoute un fichier de modèle (.bin ou .gguf) à l\'app, puis appuie sur Rafraîchir.</string>
+    <string name="settings_model_file">%1$s (%2$s)</string>
+    <string name="settings_model_line">%1$s · %2$s</string>
+    <string name="settings_download_title">Télécharger un modèle</string>
+    <string name="settings_download_action">Télécharger</string>
+    <string name="settings_models_installed">Tous les modèles proposés sont installés.</string>
+    <string name="settings_download_connecting">%s : connexion…</string>
+    <string name="settings_download_percent">%1$s : %2$d %% (%3$s / %4$s)</string>
+    <string name="settings_download_size">%1$s : %2$s</string>
+    <string name="settings_download_done">%s : installé et sélectionné.</string>
+    <string name="settings_model_ready">Modèle prêt</string>
+    <string name="settings_download_failed">Échec du téléchargement : %s</string>
+    <string name="settings_failed">Échec : %s</string>
+    <string name="settings_storage_unavailable">Stockage indisponible</string>
+
+    <!-- Catalogue de modèles -->
+    <string name="catalog_q4k">Q4_K — le plus rapide</string>
+    <string name="catalog_q8">Q8_0 — plus précis</string>
+    <string name="catalog_error_server">serveur : HTTP %d</string>
+    <string name="catalog_error_partial">fichier incomplet</string>
+    <string name="catalog_error_write">écriture impossible</string>
+    <string name="catalog_error_network">erreur réseau</string>
+
+    <!-- Dictée -->
+    <string name="settings_dictation">Dictée</string>
+    <string name="settings_language">Langue</string>
+    <string name="settings_language_fr">Français</string>
+    <string name="settings_command">Commande</string>
+    <string name="settings_command_value">Appui pour dicter, appui pour arrêter</string>
+    <string name="settings_transcription">Transcription</string>
+    <string name="settings_on_device">Sur le téléphone</string>
+    <string name="settings_how_to_dictate">Pour dicter</string>
+    <string name="settings_how_to_dictate_value">Ouvre un champ de texte : la touche apparaît en bas à gauche du clavier.</string>
+
+    <!-- À propos -->
+    <string name="settings_about">À propos</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_version_unknown">inconnue</string>
+    <string name="settings_bench_on">Banc d\'essai activé</string>
+    <string name="settings_bench_off">Banc d\'essai masqué</string>
+
+    <!-- Onglets -->
+    <string name="nav_home">Accueil</string>
+    <string name="nav_settings">Réglages</string>
+    <string name="nav_keywords">Mots-clés</string>
+    <string name="nav_history">Historique</string>
+    <string name="nav_dictionary">Dictionnaire</string>
+
+    <!-- Banc d'essai -->
+    <string name="bench_title">Banc d\'essai</string>
+    <string name="bench_backend">backend : %s</string>
+    <string name="bench_model">Modèle</string>
+    <string name="bench_import">Importer un modèle…</string>
+    <string name="bench_no_model">Aucun modèle. Utilise Importer (dossier %s).</string>
+    <string name="bench_threads">Threads</string>
+    <string name="bench_duration">Durée</string>
+    <string name="bench_seconds">%d s</string>
+    <string name="bench_record">Enregistrer</string>
+    <string name="bench_pick_wav">Choisir un WAV…</string>
+    <string name="bench_audio_none">audio : aucun</string>
+    <string name="bench_audio">audio : %s</string>
+    <string name="bench_audio_recording">audio : enregistrement %d s…</string>
+    <string name="bench_audio_samples">audio : %1$s, %2$.2f s (%3$d échantillons)</string>
+    <string name="bench_source_mic">micro %d s</string>
+    <string name="bench_transcribe">Transcrire</string>
+    <string name="bench_running">en cours…</string>
+    <string name="bench_failed">échec</string>
+    <string name="bench_err_model">Choisis d\'abord un modèle</string>
+    <string name="bench_err_audio">Enregistre ou choisis un audio d\'abord</string>
+    <string name="bench_err_load">chargement du modèle impossible : %s</string>
+    <string name="bench_metrics">"audio     %1$.2f s\nwall      %2$.0f ms  (encode %3$.0f / decode %4$.0f)\nRTF       %5$.3f\npeak RSS  %6$s\nnative    %7$s (alloué)\nbackend   %8$s · %9$d threads"</string>
+</resources>

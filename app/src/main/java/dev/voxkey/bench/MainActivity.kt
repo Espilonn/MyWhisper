@@ -92,11 +92,11 @@ class MainActivity : Activity() {
             setPadding(ui.dp(8), ui.dp(6), ui.dp(8), ui.dp(6))
         }
         listOf(
-            Triple(R.drawable.ic_nav_home, "Accueil", 0),
-            Triple(R.drawable.ic_nav_settings, "Réglages", 1),
-            Triple(R.drawable.ic_nav_keywords, "Mots-clés", 2),
-            Triple(R.drawable.ic_nav_history, "Historique", 3),
-            Triple(R.drawable.ic_nav_dictionary, "Dictionnaire", 4),
+            Triple(R.drawable.ic_nav_home, getString(R.string.nav_home), 0),
+            Triple(R.drawable.ic_nav_settings, getString(R.string.nav_settings), 1),
+            Triple(R.drawable.ic_nav_keywords, getString(R.string.nav_keywords), 2),
+            Triple(R.drawable.ic_nav_history, getString(R.string.nav_history), 3),
+            Triple(R.drawable.ic_nav_dictionary, getString(R.string.nav_dictionary), 4),
         ).forEach { (res, label, index) -> nav.addView(navItem(res, label, index)) }
 
         val bar = LinearLayout(this).apply {
@@ -226,15 +226,15 @@ class MainActivity : Activity() {
     /** Carte du banc d'essai : modèle, threads, durée, capture/WAV, transcription, métriques. */
     private fun benchCard(): View {
         val card = ui.card()
-        card.addView(ui.sectionTitle(R.drawable.ic_words, "Banc d'essai"))
-        card.addFull(ui.text("backend : ${Whisper.nativeBackend()}", 12f, Ui.MUTED), 8)
+        card.addView(ui.sectionTitle(R.drawable.ic_words, getString(R.string.bench_title)))
+        card.addFull(ui.text(ui.t(R.string.bench_backend, Whisper.nativeBackend()), 12f, Ui.MUTED), 8)
 
-        card.addFull(ui.text("Modèle", 13f, Ui.MUTED, bold = true), 14)
+        card.addFull(ui.text(ui.t(R.string.bench_model), 13f, Ui.MUTED, bold = true), 14)
         modelsBox = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
         card.addFull(modelsBox, 4)
-        card.addFull(ui.button("Importer un modèle…", primary = false) { pickFile(REQ_MODEL, "*/*") }, 8)
+        card.addFull(ui.button(ui.t(R.string.bench_import), primary = false) { pickFile(REQ_MODEL, "*/*") }, 8)
 
-        card.addFull(ui.text("Threads", 13f, Ui.MUTED, bold = true), 14)
+        card.addFull(ui.text(ui.t(R.string.bench_threads), 13f, Ui.MUTED, bold = true), 14)
         etThreads = EditText(this).apply {
             setText("4")
             inputType = InputType.TYPE_CLASS_NUMBER
@@ -245,17 +245,23 @@ class MainActivity : Activity() {
         }
         card.addFull(etThreads, 4)
 
-        card.addFull(ui.text("Durée", 13f, Ui.MUTED, bold = true), 14)
-        card.addFull(ui.segmented(listOf("10 s", "30 s"), 0) { durationSec = if (it == 1) 30 else 10 }, 4)
+        card.addFull(ui.text(ui.t(R.string.bench_duration), 13f, Ui.MUTED, bold = true), 14)
+        card.addFull(
+            ui.segmented(
+                listOf(ui.t(R.string.bench_seconds, 10), ui.t(R.string.bench_seconds, 30)),
+                0,
+            ) { durationSec = if (it == 1) 30 else 10 },
+            4,
+        )
 
-        btnRecord = ui.button("Enregistrer", primary = false) { record() }
+        btnRecord = ui.button(ui.t(R.string.bench_record), primary = false) { record() }
         card.addFull(btnRecord, 14)
-        card.addFull(ui.button("Choisir un WAV…", primary = false) { pickFile(REQ_WAV, "audio/*") }, 8)
+        card.addFull(ui.button(ui.t(R.string.bench_pick_wav), primary = false) { pickFile(REQ_WAV, "audio/*") }, 8)
 
-        tvAudio = ui.text("audio : aucun", 13f, Ui.MUTED)
+        tvAudio = ui.text(ui.t(R.string.bench_audio_none), 13f, Ui.MUTED)
         card.addFull(tvAudio, 10)
 
-        btnTranscribe = ui.button("Transcrire", primary = true) { transcribe() }
+        btnTranscribe = ui.button(ui.t(R.string.bench_transcribe), primary = true) { transcribe() }
         card.addFull(btnTranscribe, 10)
 
         tvMetrics = ui.text("", 12f, Ui.MUTED).apply { typeface = Typeface.MONOSPACE }
@@ -281,7 +287,7 @@ class MainActivity : Activity() {
         val files = modelFiles()
         if (files.isEmpty()) {
             benchModel = null
-            modelsBox.addView(ui.text("Aucun modèle. Utilise Importer (dossier ${getExternalFilesDir(null)?.path}).", 13f, Ui.MUTED))
+            modelsBox.addView(ui.text(ui.t(R.string.bench_no_model, getExternalFilesDir(null)?.path.toString()), 13f, Ui.MUTED))
             return
         }
         val saved = getSharedPreferences("voxkey", MODE_PRIVATE).getString("model", null)
@@ -289,7 +295,7 @@ class MainActivity : Activity() {
         files.forEach { f ->
             val rb = RadioButton(this).apply {
                 id = View.generateViewId()
-                text = "${f.name}  (${"%.1f".format(f.length() / 1e6)} Mo)"
+                text = "${f.name}  (${ui.t(R.string.megabytes, "%.1f".format(f.length() / 1e6))})"
                 setTextColor(Ui.INK)
                 setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT))
                 tag = f
@@ -345,7 +351,7 @@ class MainActivity : Activity() {
                     }
                     runOnUiThread {
                         decoded.onSuccess { setAudio(it, queryName(uri) ?: "wav") }
-                            .onFailure { tvAudio.text = "audio : ${it.message}" }
+                            .onFailure { tvAudio.text = ui.t(R.string.bench_audio, it.message.toString()) }
                     }
                 }.start()
             }
@@ -369,21 +375,24 @@ class MainActivity : Activity() {
         }
         val seconds = durationSec
         setBusy(true)
-        tvAudio.text = "audio : enregistrement ${seconds} s…"
+        tvAudio.text = ui.t(R.string.bench_audio_recording, seconds)
         Thread {
             val result = runCatching { Audio.record(seconds) }
             runOnUiThread {
                 setBusy(false)
-                result.onSuccess { setAudio(it, "micro ${seconds} s") }
-                    .onFailure { tvAudio.text = "audio : ${it.message}" }
+                result.onSuccess { setAudio(it, ui.t(R.string.bench_source_mic, seconds)) }
+                    .onFailure { tvAudio.text = ui.t(R.string.bench_audio, it.message.toString()) }
             }
         }.start()
     }
 
     private fun setAudio(samples: FloatArray, source: String) {
         pcm = samples
-        tvAudio.text = "audio : $source, %.2f s (${samples.size} échantillons)".format(
-            samples.size / Audio.RATE.toDouble()
+        tvAudio.text = ui.t(
+            R.string.bench_audio_samples,
+            source,
+            samples.size / Audio.RATE.toDouble(),
+            samples.size,
         )
     }
 
@@ -391,12 +400,12 @@ class MainActivity : Activity() {
 
     private fun transcribe() {
         val model = benchModel
-        if (model == null) { tvText.text = "Choisis d'abord un modèle"; return }
-        if (pcm.isEmpty()) { tvText.text = "Enregistre ou choisis un audio d'abord"; return }
+        if (model == null) { tvText.text = ui.t(R.string.bench_err_model); return }
+        if (pcm.isEmpty()) { tvText.text = ui.t(R.string.bench_err_audio); return }
 
         val threads = etThreads.text.toString().toIntOrNull() ?: 4
         setBusy(true)
-        tvMetrics.text = "en cours…"
+        tvMetrics.text = ui.t(R.string.bench_running)
         val samples = pcm
 
         Thread {
@@ -405,7 +414,7 @@ class MainActivity : Activity() {
                     if (handle != 0L) Whisper.nativeFree(handle)
                     handle = Whisper.nativeInit(model.path, threads)
                     loadedModel = if (handle != 0L) model.path else null
-                    if (handle == 0L) error("chargement du modèle impossible : ${model.name}")
+                    if (handle == 0L) error(ui.t(R.string.bench_err_load, model.name))
                 }
                 JSONObject(Whisper.nativeRun(handle, samples, "fr"))
             }
@@ -421,12 +430,12 @@ class MainActivity : Activity() {
     ) {
         setBusy(false)
         val json = outcome.getOrElse {
-            tvMetrics.text = "échec"
+            tvMetrics.text = ui.t(R.string.bench_failed)
             tvText.text = it.message
             return
         }
         json.optString("error").takeIf { it.isNotEmpty() }?.let {
-            tvMetrics.text = "échec"
+            tvMetrics.text = ui.t(R.string.bench_failed)
             tvText.text = it
             return
         }
@@ -439,17 +448,12 @@ class MainActivity : Activity() {
         val peakKb = peakRssKb()
         val text = json.optString("text")
 
-        tvMetrics.text = """
-            audio     %.2f s
-            wall      %.0f ms  (encode %.0f / decode %.0f)
-            RTF       %.3f
-            peak RSS  %d Mo
-            native    %d Mo (alloué)
-            backend   %s · %d threads
-        """.trimIndent().format(
+        tvMetrics.text = ui.t(
+            R.string.bench_metrics,
             audioSec, wallMs, encodeMs, decodeMs, rtf,
-            peakKb / 1024, Debug.getNativeHeapAllocatedSize() / (1024 * 1024),
-            Whisper.nativeBackend(), threads
+            ui.t(R.string.megabytes, peakKb / 1024),
+            ui.t(R.string.megabytes, Debug.getNativeHeapAllocatedSize() / (1024 * 1024)),
+            Whisper.nativeBackend(), threads,
         )
         tvText.text = text
 

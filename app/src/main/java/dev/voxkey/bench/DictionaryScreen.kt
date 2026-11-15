@@ -13,21 +13,21 @@ import android.widget.LinearLayout
  */
 class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
 
-    private val search = ui.input("Rechercher dans mes mots")
+    private val search = ui.input(ui.t(R.string.dictionary_search))
     private val count = ui.meta("")
     private val section = android.widget.LinearLayout(act).apply {
         orientation = android.widget.LinearLayout.HORIZONTAL
         gravity = android.view.Gravity.CENTER_VERTICAL
-        addView(ui.heading("Mes mots"), android.widget.LinearLayout.LayoutParams(0, WRAP, 1f))
+        addView(ui.heading(ui.t(R.string.dictionary_section)), android.widget.LinearLayout.LayoutParams(0, WRAP, 1f))
         addView(count)
     }
     private val list = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
     /** Emplacement de l'état vide : occupe la hauteur libre, sans déplacer la recherche. */
     private val emptyBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
     private val page = ui.page(
-        title = "Dictionnaire",
-        subtitle = "Tes noms propres et tes marques, gardés à part.",
-        trailing = ui.iconButton(R.drawable.ic_add, "Ajouter un mot") { addWord() }.also { addButton = it },
+        title = ui.t(R.string.dictionary_title),
+        subtitle = ui.t(R.string.dictionary_subtitle),
+        trailing = ui.iconButton(R.drawable.ic_add, ui.t(R.string.dictionary_add)) { addWord() }.also { addButton = it },
     )
     private lateinit var addButton: View
     private val body = page.body
@@ -60,9 +60,9 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
         val total = Store.words().size
         count.text = when {
             total == 0 -> ""
-            query.isBlank() -> if (total == 1) "1 mot" else "$total mots"
+            query.isBlank() -> ui.q(R.plurals.words, total)
             hits.isEmpty() -> ""
-            else -> "${hits.size} sur $total"
+            else -> ui.t(R.string.dictionary_count, hits.size, total)
         }
         count.visibility = if (count.text.isEmpty()) View.GONE else View.VISIBLE
         // Sans aucun mot, la recherche et l'intitulé de section n'ont rien à interroger ;
@@ -73,17 +73,16 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
             val empty = if (total == 0) {
                 ui.empty(
                     R.drawable.ic_nav_dictionary,
-                    "Ta liste est vide",
-                    "Garde ici les prénoms, les marques et les termes de métier que tu veux " +
-                        "retrouver. Rien ne quitte ce téléphone.",
-                    action = "Ajouter un mot",
+                    ui.t(R.string.dictionary_empty_title),
+                    ui.t(R.string.dictionary_empty_body),
+                    action = ui.t(R.string.dictionary_add),
                     onAction = { addWord() },
                 )
             } else {
                 ui.empty(
                     R.drawable.ic_nav_dictionary,
-                    "Aucun mot trouvé",
-                    "Rien ne correspond à « ${query.trim()} ».",
+                    ui.t(R.string.dictionary_empty_search_title),
+                    ui.t(R.string.dictionary_empty_search_body, query.trim()),
                 )
             }
             emptyBox.center(empty)
@@ -101,15 +100,15 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
     private fun wordRow(e: WordEntry) = ui.listRow(
         title = e.word,
         glyphIcon = R.drawable.ic_delete,
-        glyphDesc = "Supprimer « ${e.word} »",
+        glyphDesc = ui.t(R.string.dictionary_delete_desc, e.word),
         onGlyph = { confirmDelete(e) },
     )
 
     private fun confirmDelete(e: WordEntry) {
         ui.confirm(
-            title = "Supprimer « ${e.word} » ?",
-            message = "Le mot sera retiré de ta liste.",
-            confirmLabel = "Supprimer",
+            title = ui.t(R.string.dictionary_delete_title, e.word),
+            message = ui.t(R.string.dictionary_delete_message),
+            confirmLabel = ui.t(R.string.delete),
             destructive = true,
             onConfirm = {
                 Store.deleteWord(e.word)
@@ -120,10 +119,10 @@ class DictionaryScreen(private val act: Activity, private val ui: UiKit) {
 
     private fun addWord() {
         ui.prompt(
-            title = "Ajouter un mot",
-            subtitle = "Un prénom, une marque, un terme que tu veux garder tel quel.",
-            fields = listOf(UiKit.Field("Mot", hint = "Ex. : Voxkey")),
-            confirm = "Ajouter",
+            title = ui.t(R.string.dictionary_add),
+            subtitle = ui.t(R.string.dictionary_prompt_subtitle),
+            fields = listOf(UiKit.Field(ui.t(R.string.dictionary_field_word), hint = ui.t(R.string.dictionary_field_hint))),
+            confirm = ui.t(R.string.dictionary_add_confirm),
         ) { values ->
             val word = values.firstOrNull().orEmpty()
             if (word.isEmpty()) {

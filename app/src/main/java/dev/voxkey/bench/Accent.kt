@@ -15,13 +15,13 @@ object Accent {
     private const val KEY = "accent"
     const val DEFAULT = 0xFFFFD400.toInt()
 
-    /** Cinq accents lisibles sur le fond de l'app, du plus vif au plus doux. */
+    /** Cinq accents lisibles sur le fond de l'app, du plus vif au plus doux (libellé, couleur). */
     val palette = listOf(
-        "Jaune" to 0xFFFFD400.toInt(),
-        "Bleu" to 0xFF4C8DFF.toInt(),
-        "Vert" to 0xFF3ED98B.toInt(),
-        "Violet" to 0xFFB49BFF.toInt(),
-        "Orange" to 0xFFFF8F45.toInt(),
+        R.string.accent_yellow to 0xFFFFD400.toInt(),
+        R.string.accent_blue to 0xFF4C8DFF.toInt(),
+        R.string.accent_green to 0xFF3ED98B.toInt(),
+        R.string.accent_purple to 0xFFB49BFF.toInt(),
+        R.string.accent_orange to 0xFFFF8F45.toInt(),
     )
 
     private var cached = DEFAULT
@@ -45,7 +45,8 @@ object Accent {
             .edit().putInt(KEY, color).apply()
     }
 
-    fun name(): String = palette.firstOrNull { it.second == current() }?.first ?: "Personnalisé"
+    /** Libellé de l'accent courant, ou « Personnalisé » s'il ne vient pas de la palette. */
+    fun nameRes(): Int = palette.firstOrNull { it.second == current() }?.first ?: R.string.accent_custom
 
     /** Encre posée sur l'accent : on garde celle qui contraste le plus, jamais une valeur figée. */
     fun on(color: Int): Int =

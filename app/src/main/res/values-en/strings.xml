@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- English translation of values/strings.xml. Same keys, same order. -->
 <resources>
     <string name="app_name">MyWisper</string>
     <string name="a11y_desc">Lets MyWisper type your dictation into the active field.</string>
     <string name="a11y_dictate">Dictate</string>
     <string name="notif_channel_name">Dictation</string>
     <string name="notif_dictating">Dictating…</string>
+
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="megabytes">%s MB</string>
+    <string name="weekday_initials">MTWTFSS</string>
+
+    <plurals name="words">
+        <item quantity="one">%s word</item>
+        <item quantity="other">%s words</item>
+    </plurals>
 </resources>

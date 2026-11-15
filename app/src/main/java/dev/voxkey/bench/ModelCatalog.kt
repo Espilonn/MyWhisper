@@ -1,5 +1,6 @@
 package dev.voxkey.bench
 
+import android.content.Context
 import android.util.Log
 import java.io.File
 import java.net.HttpURLConnection
@@ -13,21 +14,23 @@ import kotlin.concurrent.thread
  */
 object ModelCatalog {
 
-    data class Remote(val file: String, val label: String, val bytes: Long) {
+    /** [labelRes] est le libellé affiché, une des clés `catalog_*`. */
+    data class Remote(val file: String, val labelRes: Int, val bytes: Long) {
         val mo: Long get() = bytes / 1_048_576
     }
 
     private const val BASE = "https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/"
 
     val all = listOf(
-        Remote("ggml-parakeet-tdt-0.6b-v3-q4_k.bin", "Q4_K — le plus rapide", 415_611_879),
-        Remote("ggml-parakeet-tdt-0.6b-v3-q8_0.bin", "Q8_0 — plus précis", 668_757_119),
+        Remote("ggml-parakeet-tdt-0.6b-v3-q4_k.bin", R.string.catalog_q4k, 415_611_879),
+        Remote("ggml-parakeet-tdt-0.6b-v3-q8_0.bin", R.string.catalog_q8, 668_757_119),
     )
 
     fun url(file: String) = BASE + file
 
     /** Télécharge vers [dir], écrit dans un `.part` puis renomme : un fichier partiel ne casse pas l'app. */
     fun download(
+        ctx: Context,
         file: String,
         dir: File,
         onProgress: (Long, Long) -> Unit,
@@ -45,7 +48,7 @@ object ModelCatalog {
                 try {
                     val code = conn.responseCode
                     if (code !in 200..299) {
-                        onError("serveur : HTTP $code")
+                        onError(ctx.getString(R.string.catalog_error_server, code))
                         return@thread
                     }
                     val total = conn.contentLengthLong
@@ -72,12 +75,12 @@ object ModelCatalog {
 
                 if (part.length() < 1_000_000) {
                     part.delete()
-                    onError("fichier incomplet")
+                    onError(ctx.getString(R.string.catalog_error_partial))
                     return@thread
                 }
                 if (!part.renameTo(dest)) {
                     part.delete()
-                    onError("écriture impossible")
+                    onError(ctx.getString(R.string.catalog_error_write))
                     return@thread
                 }
                 onProgress(dest.length(), dest.length())
@@ -85,7 +88,7 @@ object ModelCatalog {
             } catch (t: Throwable) {
                 Log.w("VXK", "download $file", t)
                 part.delete()
-                onError(t.message ?: "erreur réseau")
+                onError(t.message ?: ctx.getString(R.string.catalog_error_network))
             }
         }
     }

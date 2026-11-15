@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Mots-clés et Dictionnaire : libellés d'interface. Mêmes clés, même ordre
+    dans values-en/strings_words.xml. Les comptes passent par des pluriels.
+-->
+<resources>
+    <!-- Mots-clés -->
+    <string name="keywords_title">Mots-clés</string>
+    <string name="keywords_subtitle">Une abréviation tapée, un texte complet écrit.</string>
+    <string name="keywords_add">Ajouter un mot-clé</string>
+    <string name="keywords_empty_title">Aucun mot-clé</string>
+    <string name="keywords_empty_body">Dis « mail merci » et MyWisper écrira ta formule de politesse en entier.</string>
+    <string name="keywords_empty_action">Créer un mot-clé</string>
+    <string name="keywords_section">Mes mots-clés</string>
+    <plurals name="keywords_count">
+        <item quantity="one">%s mot-clé</item>
+        <item quantity="other">%s mots-clés</item>
+    </plurals>
+    <string name="keywords_tip">Appuie sur un mot-clé pour le modifier. Le déclencheur n\'est remplacé que lorsque tu dictes ce mot seul.</string>
+    <string name="keywords_new">Nouveau mot-clé</string>
+    <string name="keywords_edit">Modifier le mot-clé</string>
+    <string name="keywords_prompt_subtitle">Tapé seul pendant la dictée, le déclencheur est remplacé par le texte.</string>
+    <string name="keywords_trigger">Déclencheur</string>
+    <string name="keywords_trigger_hint">Ex. : mail merci</string>
+    <string name="keywords_text">Texte écrit à la place</string>
+    <string name="keywords_text_hint">Merci beaucoup pour ton retour…</string>
+    <string name="keywords_add_confirm">Ajouter</string>
+    <string name="keywords_delete_title">Supprimer « %1$s » ?</string>
+    <string name="keywords_delete_desc">Supprimer « %1$s »</string>
+    <string name="keywords_delete_message">Le raccourci disparaît ; le texte ne sera plus écrit à ta place.</string>
+    <string name="keywords_initial">?</string>
+
+    <!-- Dictionnaire -->
+    <string name="dictionary_title">Dictionnaire</string>
+    <string name="dictionary_subtitle">Tes noms propres et tes marques, gardés à part.</string>
+    <string name="dictionary_add">Ajouter un mot</string>
+    <string name="dictionary_add_confirm">Ajouter</string>
+    <string name="dictionary_search">Rechercher dans mes mots</string>
+    <string name="dictionary_section">Mes mots</string>
+    <string name="dictionary_count">%1$d sur %2$d</string>
+    <string name="dictionary_empty_search_title">Aucun mot trouvé</string>
+    <string name="dictionary_empty_search_body">Rien ne correspond à « %1$s ».</string>
+    <string name="dictionary_empty_title">Ta liste est vide</string>
+    <string name="dictionary_empty_body">Garde ici les prénoms, les marques et les termes de métier que tu veux retrouver. Rien ne quitte ce téléphone.</string>
+    <string name="dictionary_delete_message">Le mot sera retiré de ta liste.</string>
+    <string name="dictionary_prompt_subtitle">Un prénom, une marque, un terme que tu veux garder tel quel.</string>
+    <string name="dictionary_field_word">Mot</string>
+    <string name="dictionary_field_hint">Ex. : Voxkey</string>
+    <string name="dictionary_delete_title">Supprimer « %1$s » ?</string>
+    <string name="dictionary_delete_desc">Supprimer « %1$s »</string>
+</resources>

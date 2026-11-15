@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translation of values/strings_home.xml: Home (home_) and History (history_) screens. -->
+<resources>
+    <!-- Home -->
+    <string name="home_tagline">Your dictation, on your phone</string>
+    <string name="home_status_ready">●\u0020\u0020Ready</string>
+    <string name="home_configure">Set up</string>
+    <string name="home_words_label">Words dictated</string>
+    <string name="home_span_week">Week</string>
+    <string name="home_span_month">Month</string>
+    <string name="home_span_six_months">6 months</string>
+    <string name="home_caption_week">over 7 days</string>
+    <string name="home_caption_month">over 30 days</string>
+    <string name="home_caption_six_months">over 6 months</string>
+    <string name="home_delta">%1$s %2$d %%</string>
+    <string name="home_join">%1$s · %2$s</string>
+    <string name="home_wordless">no dictation</string>
+    <string name="home_legend_less">less</string>
+    <string name="home_legend_more">more</string>
+    <string name="home_latest">Latest dictations</string>
+    <string name="home_see_all">See all →</string>
+    <string name="home_journal_empty">Your dictations will show up here.</string>
+    <string name="home_empty_title">No words yet</string>
+    <string name="home_empty_body">Open a text field, then tap the dictation key at the bottom of the keyboard. Your words will show up here, day after day.</string>
+    <string name="home_setup">Set up</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_subtitle">Newest first.</string>
+    <string name="history_empty_title">No dictations</string>
+    <string name="history_empty_body">Every dictation is kept here. Open a text field, then tap the dictation key.</string>
+    <string name="history_row_meta">%1$s · %2$s</string>
+    <string name="history_delete_desc">Delete this dictation</string>
+    <string name="history_delete_title">Delete this dictation?</string>
+    <string name="history_delete_message">“%1$s” will be deleted for good.</string>
+    <plurals name="history_dictations">
+        <item quantity="one">%s dictation</item>
+        <item quantity="other">%s dictations</item>
+    </plurals>
+
+    <string name="home_activity_desc">Dictation activity over the last %1$d days</string>
+</resources>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English translation of values/strings_settings.xml. Same keys, same order. -->
+<resources>
+
+    <!-- Settings: header and setup -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_desc">Permissions, model and how dictation works.</string>
+    <string name="settings_setup">Get started</string>
+    <string name="settings_progress">%1$d of %2$d</string>
+
+    <string name="settings_step_overlay">Overlay</string>
+    <string name="settings_step_overlay_hint">Shows the key over other apps.</string>
+    <string name="settings_step_overlay_done">Allowed</string>
+    <string name="settings_step_overlay_action">Allow overlay</string>
+    <string name="settings_overlay_first">Allow overlay first</string>
+
+    <string name="settings_step_a11y">Accessibility</string>
+    <string name="settings_step_a11y_hint">Types dictated text into the active field.</string>
+    <string name="settings_step_a11y_done">Enabled</string>
+    <string name="settings_step_a11y_action">Open accessibility settings</string>
+
+    <string name="settings_step_mic">Microphone</string>
+    <string name="settings_step_mic_hint">Records your voice during dictation.</string>
+    <string name="settings_step_mic_done">Allowed</string>
+    <string name="settings_step_mic_action">Allow microphone</string>
+
+    <string name="settings_step_key">Dictation key</string>
+    <string name="settings_step_key_hint">Appears at the bottom left of the keyboard.</string>
+    <string name="settings_step_key_done">On</string>
+    <string name="settings_step_key_action">Enable the dictation key</string>
+    <string name="settings_step_key_off_action">Disable the dictation key</string>
+    <string name="settings_key_on">Dictation key enabled</string>
+    <string name="settings_key_off">Dictation key disabled</string>
+
+    <!-- Appearance -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_hint">The colour of buttons, the active pill and the bubble.</string>
+    <string name="settings_accent_named">%s accent</string>
+    <string name="settings_accent_chosen">, selected</string>
+
+    <!-- Theme accents -->
+    <string name="accent_yellow">Yellow</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_custom">Custom</string>
+
+    <!-- Recognition model -->
+    <string name="settings_model">Recognition model</string>
+    <string name="settings_refresh">Refresh</string>
+    <string name="settings_model_empty">No model found. Add a model file (.bin or .gguf) to the app, then tap Refresh.</string>
+    <string name="settings_model_file">%1$s (%2$s)</string>
+    <string name="settings_model_line">%1$s · %2$s</string>
+    <string name="settings_download_title">Download a model</string>
+    <string name="settings_download_action">Download</string>
+    <string name="settings_models_installed">All offered models are installed.</string>
+    <string name="settings_download_connecting">%s: connecting…</string>
+    <string name="settings_download_percent">%1$s: %2$d%% (%3$s / %4$s)</string>
+    <string name="settings_download_size">%1$s: %2$s</string>
+    <string name="settings_download_done">%s: installed and selected.</string>
+    <string name="settings_model_ready">Model ready</string>
+    <string name="settings_download_failed">Download failed: %s</string>
+    <string name="settings_failed">Failed: %s</string>
+    <string name="settings_storage_unavailable">Storage unavailable</string>
+
+    <!-- Model catalog -->
+    <string name="catalog_q4k">Q4_K — fastest</string>
+    <string name="catalog_q8">Q8_0 — most accurate</string>
+    <string name="catalog_error_server">server: HTTP %d</string>
+    <string name="catalog_error_partial">incomplete file</string>
+    <string name="catalog_error_write">cannot write</string>
+    <string name="catalog_error_network">network error</string>
+
+    <!-- Dictation -->
+    <string name="settings_dictation">Dictation</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_fr">French</string>
+    <string name="settings_command">Command</string>
+    <string name="settings_command_value">Tap to dictate, tap to stop</string>
+    <string name="settings_transcription">Transcription</string>
+    <string name="settings_on_device">On device</string>
+    <string name="settings_how_to_dictate">To dictate</string>
+    <string name="settings_how_to_dictate_value">Open a text field: the key appears at the bottom left of the keyboard.</string>
+
+    <!-- About -->
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_version_unknown">unknown</string>
+    <string name="settings_bench_on">Benchmark enabled</string>
+    <string name="settings_bench_off">Benchmark hidden</string>
+
+    <!-- Tabs -->
+    <string name="nav_home">Home</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_keywords">Keywords</string>
+    <string name="nav_history">History</string>
+    <string name="nav_dictionary">Dictionary</string>
+
+    <!-- Benchmark -->
+    <string name="bench_title">Benchmark</string>
+    <string name="bench_backend">backend: %s</string>
+    <string name="bench_model">Model</string>
+    <string name="bench_import">Import a model…</string>
+    <string name="bench_no_model">No model. Use Import (folder %s).</string>
+    <string name="bench_threads">Threads</string>
+    <string name="bench_duration">Duration</string>
+    <string name="bench_seconds">%d s</string>
+    <string name="bench_record">Record</string>
+    <string name="bench_pick_wav">Choose a WAV…</string>
+    <string name="bench_audio_none">audio: none</string>
+    <string name="bench_audio">audio: %s</string>
+    <string name="bench_audio_recording">audio: recording %d s…</string>
+    <string name="bench_audio_samples">audio: %1$s, %2$.2f s (%3$d samples)</string>
+    <string name="bench_source_mic">mic %d s</string>
+    <string name="bench_transcribe">Transcribe</string>
+    <string name="bench_running">running…</string>
+    <string name="bench_failed">failed</string>
+    <string name="bench_err_model">Choose a model first</string>
+    <string name="bench_err_audio">Record or choose some audio first</string>
+    <string name="bench_err_load">cannot load model: %s</string>
+    <string name="bench_metrics">"audio     %1$.2f s\nwall      %2$.0f ms  (encode %3$.0f / decode %4$.0f)\nRTF       %5$.3f\npeak RSS  %6$s\nnative    %7$s (allocated)\nbackend   %8$s · %9$d threads"</string>
+</resources>

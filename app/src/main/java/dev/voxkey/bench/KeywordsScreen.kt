@@ -12,9 +12,9 @@ import android.widget.LinearLayout
 class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
 
     private val page = ui.page(
-        title = "Mots-clés",
-        subtitle = "Une abréviation tapée, un texte complet écrit.",
-        trailing = ui.iconButton(R.drawable.ic_add, "Ajouter un mot-clé") { edit(null) }.also { addButton = it },
+        title = ui.t(R.string.keywords_title),
+        subtitle = ui.t(R.string.keywords_subtitle),
+        trailing = ui.iconButton(R.drawable.ic_add, ui.t(R.string.keywords_add)) { edit(null) }.also { addButton = it },
     )
     private lateinit var addButton: View
     private val body = page.body
@@ -36,53 +36,52 @@ class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
             body.center(
                 ui.empty(
                     R.drawable.ic_nav_keywords,
-                    "Aucun mot-clé",
-                    "Dis « mail merci » et MyWisper écrira ta formule de politesse en entier.",
-                    action = "Créer un mot-clé",
+                    ui.t(R.string.keywords_empty_title),
+                    ui.t(R.string.keywords_empty_body),
+                    action = ui.t(R.string.keywords_empty_action),
                     onAction = { edit(null) },
                 ),
             )
             return
         }
-        body.addFull(ui.section("Mes mots-clés", if (keywords.size == 1) "1 mot-clé" else "${keywords.size} mots-clés"))
+        body.addFull(
+            ui.section(
+                ui.t(R.string.keywords_section),
+                ui.q(R.plurals.keywords_count, keywords.size),
+            ),
+        )
         val card = ui.card()
         keywords.forEachIndexed { i, k ->
             if (i > 0) card.addRule()
             card.addView(keywordRow(k))
         }
         body.addFull(card, 10)
-        body.addFull(
-            ui.meta(
-                "Appuie sur un mot-clé pour le modifier. Le déclencheur n'est remplacé que " +
-                    "lorsque tu dictes ce mot seul.",
-            ),
-            12,
-        )
+        body.addFull(ui.meta(ui.t(R.string.keywords_tip)), 12)
     }
 
     private fun keywordRow(k: Keyword) = ui.listRow(
         title = k.trigger,
         subtitle = k.replacement,
-        lead = ui.heading((k.trigger.firstOrNull()?.uppercase() ?: "?"), Ui.ACCENT).apply {
+        lead = ui.heading((k.trigger.firstOrNull()?.uppercase() ?: ui.t(R.string.keywords_initial)), Ui.ACCENT).apply {
             gravity = Gravity.CENTER
             background = ui.rounded(Ui.CARD_HI, 99, Ui.LINE)
             layoutParams = LinearLayout.LayoutParams(ui.dp(40), ui.dp(40))
         },
         glyphIcon = R.drawable.ic_delete,
-        glyphDesc = "Supprimer « ${k.trigger} »",
+        glyphDesc = ui.t(R.string.keywords_delete_desc, k.trigger),
         onOpen = { edit(k) },
         onGlyph = { confirmDelete(k) },
     )
 
     private fun edit(existing: Keyword?) {
         ui.prompt(
-            title = if (existing == null) "Nouveau mot-clé" else "Modifier le mot-clé",
-            subtitle = "Tapé seul pendant la dictée, le déclencheur est remplacé par le texte.",
+            title = ui.t(if (existing == null) R.string.keywords_new else R.string.keywords_edit),
+            subtitle = ui.t(R.string.keywords_prompt_subtitle),
             fields = listOf(
-                UiKit.Field("Déclencheur", hint = "Ex. : mail merci", initial = existing?.trigger.orEmpty()),
-                UiKit.Field("Texte écrit à la place", hint = "Merci beaucoup pour ton retour…", initial = existing?.replacement.orEmpty(), lines = 3),
+                UiKit.Field(ui.t(R.string.keywords_trigger), hint = ui.t(R.string.keywords_trigger_hint), initial = existing?.trigger.orEmpty()),
+                UiKit.Field(ui.t(R.string.keywords_text), hint = ui.t(R.string.keywords_text_hint), initial = existing?.replacement.orEmpty(), lines = 3),
             ),
-            confirm = if (existing == null) "Ajouter" else "Enregistrer",
+            confirm = ui.t(if (existing == null) R.string.keywords_add_confirm else R.string.save),
         ) { values ->
             val trigger = values[0]
             val replacement = values.getOrElse(1) { "" }
@@ -100,9 +99,9 @@ class KeywordsScreen(private val act: Activity, private val ui: UiKit) {
 
     private fun confirmDelete(k: Keyword) {
         ui.confirm(
-            title = "Supprimer « ${k.trigger} » ?",
-            message = "Le raccourci disparaît ; le texte ne sera plus écrit à ta place.",
-            confirmLabel = "Supprimer",
+            title = ui.t(R.string.keywords_delete_title, k.trigger),
+            message = ui.t(R.string.keywords_delete_message),
+            confirmLabel = ui.t(R.string.delete),
             destructive = true,
             onConfirm = {
                 Store.deleteKeyword(k.id)

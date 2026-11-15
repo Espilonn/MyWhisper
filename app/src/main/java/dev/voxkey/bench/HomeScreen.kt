@@ -21,8 +21,8 @@ class HomeScreen(
 ) {
     private val status = ui.pill("", Ui.MUTED, Ui.CARD_HI)
     private val page = ui.page(
-        title = "MyWisper",
-        subtitle = "Ta dictée, sur le téléphone",
+        title = ui.t(R.string.app_name),
+        subtitle = ui.t(R.string.home_tagline),
         trailing = status,
     )
     private val body = page.body
@@ -53,7 +53,7 @@ class HomeScreen(
 
     private fun paintStatus() {
         val on = ready()
-        status.text = if (on) "●  Prêt" else "Configurer"
+        status.text = if (on) ui.t(R.string.home_status_ready) else ui.t(R.string.home_configure)
         status.setTextColor(if (on) Ui.GOOD else Ui.ON_ACCENT)
         status.background = ui.rounded(if (on) Ui.GOOD_BG else Ui.ACCENT, 99)
     }
@@ -77,7 +77,7 @@ class HomeScreen(
         hero.addView(LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(ui.label("Mots dictés"), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.label(ui.t(R.string.home_words_label)), LinearLayout.LayoutParams(0, WRAP, 1f))
             addView(ui.meta(spanLabel()))
         })
         val figure = LinearLayout(act).apply {
@@ -87,7 +87,7 @@ class HomeScreen(
             deltaPercent(total, previous)?.let { delta ->
                 val up = delta >= 0
                 addView(ui.pill(
-                    "${if (up) "↑" else "↓"} ${abs(delta)} %",
+                    ui.t(R.string.home_delta, if (up) "↑" else "↓", abs(delta)),
                     if (up) Ui.GOOD else Ui.WARN,
                     if (up) Ui.GOOD_BG else Ui.WARN_BG,
                 ).apply {
@@ -99,7 +99,12 @@ class HomeScreen(
             }
         }
         hero.addView(figure, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(8) })
-        hero.addView(ui.segmented(listOf("Semaine", "Mois", "6 mois"), span) { i ->
+        val spans = listOf(
+            ui.t(R.string.home_span_week),
+            ui.t(R.string.home_span_month),
+            ui.t(R.string.home_span_six_months),
+        )
+        hero.addView(ui.segmented(spans, span) { i ->
             span = i
             render()
         }, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(14) })
@@ -132,36 +137,35 @@ class HomeScreen(
 
     /** « sur 7 jours », « sur 30 jours », « sur 6 mois » : la fenêtre lue sous le grand nombre. */
     private fun spanLabel() = when (span) {
-        0 -> "sur 7 jours"
-        1 -> "sur 30 jours"
-        else -> "sur 6 mois"
+        0 -> ui.t(R.string.home_caption_week)
+        1 -> ui.t(R.string.home_caption_month)
+        else -> ui.t(R.string.home_caption_six_months)
     }
 
     /** Aucune dictée : une seule invitation, au milieu de l'écran. */
     private fun onboarding() = ui.empty(
         R.drawable.ic_words,
-        "Aucun mot pour l'instant",
-        "Ouvre un champ de texte, puis appuie sur la touche de dictée en bas du clavier. " +
-            "Tes mots s'afficheront ici, jour après jour.",
-        action = if (ready()) null else "Mettre en place",
+        ui.t(R.string.home_empty_title),
+        ui.t(R.string.home_empty_body),
+        action = if (ready()) null else ui.t(R.string.home_setup),
         onAction = { onOpenSettings() },
     )
 
     /** « Aujourd'hui · 30 mots », le détail d'un carré touché. */
     private fun dayDetail(day: DayGrid.Day): String {
-        val label = if (day.date == LocalDate.now()) "Aujourd'hui" else dayLabel(day.date)
-        return when {
-            day.words == 0 -> "$label · aucune dictée"
-            day.words == 1 -> "$label · 1 mot"
-            else -> "$label · ${formatCount(day.words)} mots"
+        val words = if (day.words == 0) {
+            ui.t(R.string.home_wordless)
+        } else {
+            ui.q(R.plurals.words, day.words)
         }
+        return ui.t(R.string.home_join, dayName(day.date), words)
     }
 
     /** Échelle d'intensité en cinq tons, du jour vide au jour plein. */
     private fun legend() = LinearLayout(act).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        addView(ui.micro("moins").apply { setPadding(0, 0, ui.dp(6), 0) })
+        addView(ui.micro(ui.t(R.string.home_legend_less)).apply { setPadding(0, 0, ui.dp(6), 0) })
         (listOf(Ui.OFF) + Accent.ramp().toList()).forEach { c ->
             addView(View(act).apply {
                 background = ui.rounded(c, 3)
@@ -170,7 +174,7 @@ class HomeScreen(
                 }
             })
         }
-        addView(ui.micro("plus").apply { setPadding(ui.dp(3), 0, 0, 0) })
+        addView(ui.micro(ui.t(R.string.home_legend_more)).apply { setPadding(ui.dp(3), 0, 0, 0) })
     }
 
     /**
@@ -184,8 +188,8 @@ class HomeScreen(
         card.addView(LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(ui.label("Dernières dictées"), LinearLayout.LayoutParams(0, WRAP, 1f))
-            addView(ui.link("Tout voir →") { onOpenHistory() })
+            addView(ui.label(ui.t(R.string.home_latest)), LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(ui.link(ui.t(R.string.home_see_all)) { onOpenHistory() })
         })
         // Autant de dictées que la vue en laisse la place : la grille de six mois prend plus
         // de hauteur que celle de la semaine, celle du mois plus encore.
@@ -196,7 +200,7 @@ class HomeScreen(
         }
         val last = Store.dictations().take(room)
         if (last.isEmpty()) {
-            card.addView(ui.meta("Tes dictées s'afficheront ici.").apply {
+            card.addView(ui.meta(ui.t(R.string.home_journal_empty)).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, ui.dp(24), 0, ui.dp(24))
             })
@@ -205,7 +209,7 @@ class HomeScreen(
                 if (i > 0) card.addRule()
                 card.addFull(ui.listRow(
                     title = d.text,
-                    over = "${relativeStamp(d.ts)} · ${wordsLabel(d.words)}",
+                    over = ui.t(R.string.home_join, relativeStamp(d.ts), ui.q(R.plurals.words, d.words)),
                 ))
             }
         }
@@ -213,5 +217,9 @@ class HomeScreen(
     }
 
     /** « Aujourd'hui · 14:32 », « Hier · 09:41 », « 9 novembre · 16:47 ». */
-    private fun relativeStamp(ts: Long) = "${dayLabel(dayOf(ts))} · ${timeLabel(ts)}"
+    private fun relativeStamp(ts: Long) = ui.t(R.string.home_join, dayName(dayOf(ts)), timeLabel(ts))
+
+    /** Nom du jour, « Aujourd'hui » et « Hier » venus des ressources. */
+    private fun dayName(day: LocalDate) =
+        dayLabel(day, LocalDate.now(), ui.t(R.string.today), ui.t(R.string.yesterday))
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textes des écrans Accueil (home_) et Historique (history_), en français. -->
+<resources>
+    <!-- Accueil -->
+    <string name="home_tagline">Ta dictée, sur le téléphone</string>
+    <string name="home_status_ready">●\u0020\u0020Prêt</string>
+    <string name="home_configure">Configurer</string>
+    <string name="home_words_label">Mots dictés</string>
+    <string name="home_span_week">Semaine</string>
+    <string name="home_span_month">Mois</string>
+    <string name="home_span_six_months">6 mois</string>
+    <string name="home_caption_week">sur 7 jours</string>
+    <string name="home_caption_month">sur 30 jours</string>
+    <string name="home_caption_six_months">sur 6 mois</string>
+    <string name="home_delta">%1$s %2$d %%</string>
+    <string name="home_join">%1$s · %2$s</string>
+    <string name="home_wordless">aucune dictée</string>
+    <string name="home_legend_less">moins</string>
+    <string name="home_legend_more">plus</string>
+    <string name="home_latest">Dernières dictées</string>
+    <string name="home_see_all">Tout voir →</string>
+    <string name="home_journal_empty">Tes dictées s\'afficheront ici.</string>
+    <string name="home_empty_title">Aucun mot pour l\'instant</string>
+    <string name="home_empty_body">Ouvre un champ de texte, puis appuie sur la touche de dictée en bas du clavier. Tes mots s\'afficheront ici, jour après jour.</string>
+    <string name="home_setup">Mettre en place</string>
+
+    <!-- Historique -->
+    <string name="history_title">Historique</string>
+    <string name="history_subtitle">De la plus récente à la plus ancienne.</string>
+    <string name="history_empty_title">Aucune dictée</string>
+    <string name="history_empty_body">Chaque texte dicté est gardé ici. Ouvre un champ de texte, puis appuie sur la touche de dictée.</string>
+    <string name="history_row_meta">%1$s · %2$s</string>
+    <string name="history_delete_desc">Supprimer cette dictée</string>
+    <string name="history_delete_title">Supprimer cette dictée\u00A0?</string>
+    <string name="history_delete_message">« %1$s » sera effacée pour de bon.</string>
+    <plurals name="history_dictations">
+        <item quantity="one">%s dictée</item>
+        <item quantity="other">%s dictées</item>
+    </plurals>
+
+    <string name="home_activity_desc">Activité de la dictée sur %1$d jours</string>
+</resources>
