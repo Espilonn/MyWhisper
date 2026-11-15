@@ -65,17 +65,25 @@ fichier `.part` :
 | `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | 415 Mo | par défaut, le plus rapide |
 | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | 668 Mo | plus précis, plus lourd |
 
-## Performance mesurée
+## Performance
 
-Sur Nothing Phone (3a), Snapdragon 7s Gen 3, 4 threads :
+Mesures sur Nothing Phone (3a), Snapdragon 7s Gen 3, 4 threads, modèle Parakeet Q4_K :
 
-- 21,7 s d'audio → transcription en ~24 s, dont ~17,8 s pour l'encodeur ;
-- décodage quasi gratuit (~22 ms) ;
-- chargement du modèle Q4_K ~1,3 s, dont l'essentiel est le réarrangement des poids
-  quantifiés (mono-thread dans ggml).
+| | Durée |
+|---|---|
+| Transcription de 11 s d'audio | **1,5 s** (encodeur 1,21-1,39 s, décodeur 3 ms) |
+| Rapport au temps réel (RTF) | **0,14** — environ 7× plus vite que l'audio |
+| Chargement du modèle | 0,5 à 1,1 s selon la passe (fichier déjà en cache page) |
 
-Détail des mesures et pistes écartées : [docs/benchmark.md](docs/benchmark.md),
-[docs/decisions.md](docs/decisions.md).
+Deux passes successives donnent 1 522 ms et 1 544 ms, soit 1,4 % d'écart : le chiffre tient.
+L'encodeur représente plus de 95 % du temps, le décodage est négligeable. Le modèle se
+charge **pendant** la dictée, donc l'attente après l'arrêt se rapproche de l'encodage seul —
+c'est pour ça que l'usage courant paraît quasi instantané.
+
+> Ces valeurs viennent du chronométrage interne du moteur (encodeur/décodeur lus dans
+> `parakeet_get_timings()`, horloge autour de l'appel complet) ; l'app les affiche et les
+> enregistre via son banc d'essai. Méthode : [docs/benchmark.md](docs/benchmark.md).
+> Pistes écartées : [docs/decisions.md](docs/decisions.md).
 
 ## Construire
 
@@ -114,7 +122,8 @@ Installation à distance (appareil sur le même tailnet) :
   véritable `InputMethodService`, qui n'est pas encore écrit.
 - **Android 12+** requis (`minSdk 31`).
 - La bulle s'ancre sur la fenêtre de Gboard ; un autre clavier n'a pas été validé.
-- Latence supérieure au temps réel sur les dictées longues (~24 s pour 21,7 s d'audio).
+- Chaque dictée coûte d'abord le chargement du modèle (0,5 à 1,1 s, masqué par le fait qu'il
+  démarre en même temps que l'enregistrement), puis environ 0,15 × la durée de l'audio.
 
 ## Structure
 
