@@ -76,6 +76,9 @@
     <string name="settings_dictation">Dictation</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_fr">French</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_system">Phone language</string>
+    <string name="settings_language_pick">App language</string>
     <string name="settings_command">Command</string>
     <string name="settings_command_value">Tap to dictate, tap to stop</string>
     <string name="settings_transcription">Transcription</string>

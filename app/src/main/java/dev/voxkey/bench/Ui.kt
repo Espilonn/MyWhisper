@@ -560,4 +560,25 @@ class UiKit(private val ctx: Context) {
         )
         show(d, card)
     }
+
+    /** Choix unique : une option par bouton, la courante en accent. */
+    fun choose(title: String, options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+        val d = dialog()
+        val card = dialogCard()
+        card.addView(heading(title).apply { textSize = 20f })
+        options.forEachIndexed { i, label ->
+            card.addView(
+                button(label, primary = i == selected) {
+                    onPick(i)
+                    d.dismiss()
+                },
+                LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) },
+            )
+        }
+        card.addView(
+            button(t(R.string.cancel), primary = false) { d.dismiss() },
+            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) },
+        )
+        show(d, card)
+    }
 }
