@@ -66,6 +66,11 @@ class VoxkeyAccessibilityService : AccessibilityService() {
         .firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
         ?.let { w -> Rect().also { w.getBoundsInScreen(it) } }
 
+    /** Zone et id de la fenêtre du clavier (l'id sert à y attacher une surcouche). */
+    fun imeWindow(): Pair<Rect, Int>? = windows
+        .firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+        ?.let { w -> Pair(Rect().also { w.getBoundsInScreen(it) }, w.id) }
+
     private fun focusedEditable(): AccessibilityNodeInfo? {
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
         return if (node.isEditable && node.isEnabled) node else null
