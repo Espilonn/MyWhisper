@@ -55,6 +55,8 @@ class OverlayService : Service() {
         private const val SETTLE_MS = 16L
         /** Délai avant de masquer la touche quand le clavier n'est plus lu du tout. */
         private const val HIDE_GRACE_MS = 400L
+        /** Une capture de clavier par ouverture suffit : le système limite leur fréquence. */
+        private const val SAMPLE_MS = 2000L
 
         /**
          * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`).
@@ -148,6 +150,8 @@ class OverlayService : Service() {
     private var kbWasVisible = false
     private var posX = 0
     private var posY = 0
+    /** Dernière capture de la couleur du clavier (anti-rebond : une par ouverture). */
+    private var lastSampleMs = 0L
     private val attachMode: Boolean
         get() = canAttach && VoxkeyAccessibilityService.instance != null
 
@@ -463,6 +467,7 @@ class OverlayService : Service() {
         }
 
         root.addView(key, LinearLayout.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP)))
+        applyBubbleColor()
 
         params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -496,12 +501,40 @@ class OverlayService : Service() {
     }
 
     /**
-     * Surface de touche : sombre et opaque, sans bordure.
-     * En écoute, un liseré jaune reprend l'accent de l'app sur la même matière.
+     * Surface de touche : opaque, sans bordure, dans la couleur réglée (celle du clavier par
+     * défaut). Le liseré de l'écoute est porté par les bandes, pas par le fond.
      */
     private fun keyBackground(active: Boolean) = GradientDrawable().apply {
         cornerRadius = dp(9).toFloat()
-        setColor(0xFF292E33.toInt())
+        setColor(Bubble.background(this@OverlayService))
+    }
+
+    /** Applique le fond et l'encre des bandes : au montage, à chaque ouverture, après une lecture. */
+    private fun applyBubbleColor() {
+        if (!this::key.isInitialized) return
+        key.background = keyBackground(active = recording)
+        keyView.ink = Bubble.idleInk(this)
+        keyView.litInk = Bubble.litInk(this)
+    }
+
+    /**
+     * Lit la couleur du clavier, une fois par ouverture.
+     *
+     * Gboard n'expose aucun thème : la seule source est une capture de sa fenêtre, que le
+     * système limite en fréquence. La valeur est mémorisée, donc une capture ratée ou refusée
+     * laisse simplement le fond précédent.
+     */
+    private fun sampleBubbleColor() {
+        if (Bubble.mode(this) != Bubble.MODE_KEYBOARD) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastSampleMs < SAMPLE_MS) return
+        val a11y = VoxkeyAccessibilityService.instance ?: return
+        lastSampleMs = now
+        a11y.sampleKeyboardColor { color ->
+            if (color == 0 || color == Bubble.sampled(this)) return@sampleKeyboardColor
+            Bubble.setSampled(this, color)
+            applyBubbleColor()
+        }
     }
 
     /** Affichage immédiat : pas d'animation d'entrée, qui ajouterait une frame invisible. */
@@ -626,9 +659,23 @@ class OverlayService : Service() {
         val metrics = wm.currentWindowMetrics
         val screenBottom = metrics.bounds.height()
         val top = metrics.windowInsets.getInsets(WindowInsets.Type.statusBars()).top
-        posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
-        posY = screenBottom - dp(KEY_H_DP) - dp(4) - top
+        if (Bubble.custom(this)) {
+            // Fractions du clavier : la bulle suit la rotation, un écran plié et la hauteur
+            // variable du clavier, sans réglage par appareil.
+            val w = dp(KEY_W_DP)
+            val h = dp(KEY_H_DP)
+            posX = (kb.left + Bubble.x(this) * (kb.width() - w)).toInt()
+            posY = (kb.bottom - top - dp(4) - h - (1f - Bubble.y(this)) * (kb.height() - h - dp(4))).toInt()
+        } else {
+            // Position d'origine, gardée telle quelle tant que l'utilisateur n'a rien réglé.
+            posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
+            posY = screenBottom - dp(KEY_H_DP) - dp(4) - top
+        }
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
+        applyBubbleColor()
+        // Capture après la fin de l'animation : pendant la montée, la fenêtre du clavier laisse
+        // voir l'application derrière et la médiane prendrait sa couleur.
+        main.postDelayed({ sampleBubbleColor() }, 350)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
     }
 

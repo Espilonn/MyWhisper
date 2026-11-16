@@ -35,12 +35,32 @@ class WaveBarsView(context: Context) : View(context) {
     private var shaderForActive = false
     private var shader: Shader? = null
     private var shaderAccent = 0
+    private var shaderInk = 0
+    private var shaderLitInk = 0
 
     /**
      * L'accent est relu à chaque dessin : la bulle peut rester ouverte pendant que
      * l'utilisateur change la couleur de l'app, la dictée suivante suit le nouveau choix.
      */
     private fun accent(): Int = Accent.current(context)
+
+    /** Encre imposée par le fond de la bulle ; null = teintes d'origine, prévues pour un fond sombre. */
+    var ink: Int? = null
+        set(v) {
+            if (field == v) return
+            field = v
+            shader = null
+            invalidate()
+        }
+
+    /** Encre des bandes actives quand le fond est déjà l'accent. */
+    var litInk: Int? = null
+        set(v) {
+            if (field == v) return
+            field = v
+            shader = null
+            invalidate()
+        }
 
     var active = false
         set(on) {
@@ -100,13 +120,29 @@ class WaveBarsView(context: Context) : View(context) {
 
         val lit = active || busy
         val accent = accent()
-        if (shader == null || shaderForActive != lit || shaderAccent != accent) {
+        val idleInk = ink
+        val activeInk = litInk
+        if (shader == null || shaderForActive != lit || shaderAccent != accent ||
+            shaderInk != (idleInk ?: 0) || shaderLitInk != (activeInk ?: 0)
+        ) {
             shaderForActive = lit
             shaderAccent = accent
+            shaderInk = idleInk ?: 0
+            shaderLitInk = activeInk ?: 0
             shader = LinearGradient(
                 0f, (h - maxH) / 2f, 0f, (h + maxH) / 2f,
-                if (lit) Accent.light(accent) else IDLE_TOP,
-                if (lit) accent else IDLE,
+                when {
+                    lit && activeInk != null -> Accent.light(activeInk)
+                    lit -> Accent.light(accent)
+                    idleInk != null -> Accent.light(idleInk, 0.45f)
+                    else -> IDLE_TOP
+                },
+                when {
+                    lit && activeInk != null -> activeInk
+                    lit -> accent
+                    idleInk != null -> idleInk
+                    else -> IDLE
+                },
                 Shader.TileMode.CLAMP
             )
         }

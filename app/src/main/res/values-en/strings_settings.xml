@@ -38,6 +38,18 @@
     <string name="settings_accent_named">%s accent</string>
     <string name="settings_accent_chosen">, selected</string>
 
+    <!-- Bubble: position and background -->
+    <string name="settings_bubble">Bubble</string>
+    <string name="settings_bubble_horizontal">Horizontal</string>
+    <string name="settings_bubble_vertical">Vertical</string>
+    <string name="settings_bubble_percent">%1$d %%</string>
+    <string name="settings_bubble_reset">Reset position</string>
+    <string name="settings_bubble_hint">0 % at the left or top, 100 % at the right or bottom. The position follows rotation and the height of the keyboard.</string>
+    <string name="settings_bubble_color_hint">Automatic reads the key colour each time the keyboard opens; the capture stays in memory.</string>
+    <string name="settings_bubble_auto">Automatic</string>
+    <string name="settings_bubble_dark">Dark</string>
+    <string name="settings_bubble_accent">Accent</string>
+
     <!-- Theme accents -->
     <string name="accent_yellow">Yellow</string>
     <string name="accent_blue">Blue</string>

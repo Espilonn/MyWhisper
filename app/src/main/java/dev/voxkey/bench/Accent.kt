@@ -87,6 +87,6 @@ object Accent {
         return 0.2126 * ch(16) + 0.7152 * ch(8) + 0.0722 * ch(0)
     }
 
-    private const val INK_DARK = 0xFF14161B.toInt()
+    const val INK_DARK = 0xFF14161B.toInt()
     private const val INK_LIGHT = 0xFFFFFFFF.toInt()
 }
