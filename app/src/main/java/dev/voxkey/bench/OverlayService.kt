@@ -140,8 +140,8 @@ class OverlayService : Service() {
     private var host: SurfaceControlViewHost? = null
     private var overlaySc: SurfaceControl? = null
     private var attachedId = 0
-    /** Dernière géométrie de clavier placée (on ne repositionne que si elle change). */
-    private var lastKb: Rect? = null
+    /** Dernier instant où la fenêtre du clavier a été vue (délai de grâce avant libération). */
+    private var lastImeMs = 0L
     /** Instant où la fenêtre du clavier a été vue pour la première fois (diagnostic de latence). */
     private var imeSeenMs = 0L
     /** Vrai quand le clavier était ouvert au dernier tick (une réouverture force un rattachement). */
@@ -231,7 +231,7 @@ class OverlayService : Service() {
     private fun onKeyboardRead(kb: Rect?) {
         // Mode attaché : la surface suit la fenêtre du clavier d'elle-même. Aucun recalage.
         if (attachMode) {
-            checkIme(SystemClock.uptimeMillis(), "evt")
+            checkIme(SystemClock.uptimeMillis())
             return
         }
         val now = SystemClock.uptimeMillis()
@@ -283,7 +283,7 @@ class OverlayService : Service() {
                 }
                 val a11y = VoxkeyAccessibilityService.instance
                 if (attachMode && a11y != null) {
-                    checkIme(now, "poll")
+                    checkIme(now)
                 } else if (recording) {
                     if (root.visibility != View.VISIBLE) reveal()
                 } else if (a11y != null) {
@@ -313,22 +313,27 @@ class OverlayService : Service() {
      * clavier est publiée par le système par à-coups (on l'a vue sauter de « fermé » à « ouvert »
      * sans valeur intermédiaire), donc attendre le tick suivant ne fait qu'ajouter du retard.
      */
-    private fun checkIme(now: Long, src: String) {
-        // La surface suit la fenêtre du clavier : elle apparaît, glisse et disparaît avec elle.
-        // Une fois posée, on n'y touche plus — la détacher puis la reconstruire à chaque
-        // ouverture était ce qui la rendait invisible (l'ancienne surface restait attachée à une
-        // fenêtre morte avec le même id).
+    private fun checkIme(now: Long) {
+        // La surface suit la fenêtre du clavier : une fois accrochée, elle glisse et disparaît
+        // avec lui. Seul le rattachement à une nouvelle ouverture est de notre ressort.
         val a11y = VoxkeyAccessibilityService.instance ?: return
-        val w = a11y.imeWindow() ?: return
+        val w = a11y.imeWindow()
         // Un seul pixel de clavier visible suffit : accrochée dès le début de la montée, la
         // surface suit ensuite l'animation d'elle-même. Attendre que le clavier soit levé de
         // 150 px ajoutait exactement le délai qu'on voyait à l'ouverture.
-        val visible = w.first.top < wm.currentWindowMetrics.bounds.height()
+        val visible = w != null && w.first.top < wm.currentWindowMetrics.bounds.height()
         if (!visible) {
+            // Clavier fermé : c'est ici que se jouait le bug de la bulle qui ne revenait jamais.
+            // `imeWindow()` manque parfois une frame pendant l'animation, donc on note la fermeture
+            // tout de suite (une réouverture doit rattacher) mais on ne libère la surface qu'après
+            // une absence continue — sinon chaque ouverture clignotait.
             kbWasVisible = false
             imeSeenMs = 0L
+            // Une dictée en cours garde sa surface même si Gboard se referme (bouton retour).
+            if (overlaySc != null && !recording && now - lastImeMs > HIDE_GRACE_MS) detachBubble()
             return
         }
+        lastImeMs = now
         // Diagnostic de latence : `ime seen` marque l'instant où la fenêtre du clavier apparaît,
         // et les lignes `attach`/`reparent` donnent le retard réel avant que la bulle soit posée.
         if (imeSeenMs == 0L) {
@@ -343,7 +348,6 @@ class OverlayService : Service() {
             // fenêtre détruite ne revient jamais d'elle-même — c'est pour ça que la bulle
             // manquait à la réouverture. Un id inchangé ne prouve donc rien.
             w.second != attachedId || !kbWasVisible -> reparentTo(a11y, w.second, w.first)
-            w.first != lastKb -> placeAttached(sc, w.first)
         }
         // Fin de dictée clavier fermé : `stopSession` a masqué la vue, mais la surface reste
         // accrochée — sans ça, rien ne la remettait visible à la réouverture du clavier.
@@ -381,7 +385,10 @@ class OverlayService : Service() {
         // En mode attaché, `root` n'appartient à aucune fenêtre WindowManager : l'ajouter ici en
         // ferait une fenêtre flottante classique, et la surface ne pourrait plus l'héberger.
         if (canAttach) {
-            detachBubble()
+            // Rien à réparer tant qu'aucune surface n'est accrochée : au démarrage à froid,
+            // `EXTRA_REBUILD` arrive juste après `onCreate` et provoquait un second attachement
+            // (deux hôtes de surface pour une seule bulle).
+            if (overlaySc != null) detachBubble()
             return
         }
         try {
@@ -590,7 +597,6 @@ class OverlayService : Service() {
         val sc = overlaySc
         overlaySc = null
         attachedId = 0
-        lastKb = null
         kbWasVisible = false
         imeSeenMs = 0L
         if (sc != null) {
@@ -623,7 +629,6 @@ class OverlayService : Service() {
         posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
         posY = screenBottom - dp(KEY_H_DP) - dp(4) - top
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
-        lastKb = Rect(kb)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
     }
 

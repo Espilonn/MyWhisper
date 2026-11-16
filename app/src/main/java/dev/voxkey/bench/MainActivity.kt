@@ -129,7 +129,10 @@ class MainActivity : Activity() {
 
         // La bulle n'a pas besoin qu'on la lance à la main : elle vit tant que
         // la permission est là et que l'utilisateur ne l'a pas désactivée.
-        if (OverlayService.isEnabled(this) && Settings.canDrawOverlays(this)) {
+        // En mode greffé, seul le service d'accessibilité est nécessaire : exiger en plus
+        // `canDrawOverlays` empêchait la relance depuis l'app. `onCreate` s'arrête de lui-même
+        // si ni l'accessibilité ni la permission ne sont là.
+        if (OverlayService.isEnabled(this)) {
             startService(Intent(this, OverlayService::class.java))
         }
 
