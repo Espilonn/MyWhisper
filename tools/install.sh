@@ -36,7 +36,11 @@ if [[ "$BOUND" == "0" ]]; then
   sleep 0.4
   "${ADB[@]}" shell settings put secure enabled_accessibility_services "${KEEP:+$KEEP:}$SVC"
   "${ADB[@]}" shell settings put secure accessibility_enabled 1
-  echo "Accessibilité réattachée (elle n'était pas liée)"
+  # Une surface composée meurt avec la connexion d'accessibilité qui l'a créée ; le service,
+  # lui, survit et garde la sienne, donc plus rien ne s'affiche. Réinstaller sur place redémarre
+  # le processus et repart d'une surface neuve (jamais de force-stop).
+  ./gradlew -q :app:installDebug
+  echo "Accessibilité réattachée (elle n'était pas liée), processus redémarré"
 fi
 
 # Laisse le système relier le service, puis vérifie que la bulle tourne vraiment.
