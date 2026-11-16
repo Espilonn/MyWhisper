@@ -57,16 +57,15 @@ class OverlayService : Service() {
         private const val HIDE_GRACE_MS = 400L
 
         /**
-         * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`), essai de la branche
-         * `exp/attached-overlay`. Désactivée, et cette fois pour de bon : la surface meurt avec la
-         * fenêtre du clavier et le système réutilise le même id, donc il fallait la rattacher à
-         * chaque ouverture — d'où un délai visible entre l'appui dans le champ et la bulle.
-         * La fenêtre `TYPE_ACCESSIBILITY_OVERLAY` n'a pas ce problème : elle nous appartient, ne
-         * dépend d'aucune fenêtre du clavier, et on la place **avant** l'animation à la dernière
-         * géométrie connue du clavier (voir `predictedKb`). Le code de la surface reste derrière ce
-         * drapeau : il compile et ne sert plus.
+         * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`).
+         *
+         * Mesuré : c'est le seul mode où la bulle apparaît sans délai (elle est déjà dans la
+         * fenêtre de Gboard, donc elle suit son animation) et où elle disparaît avec le clavier,
+         * sans traîner. Le mode fenêtre `TYPE_ACCESSIBILITY_OVERLAY` a été retenté pour anticiper
+         * l'ouverture depuis le focus : la bulle y restait affichée après la fermeture de
+         * l'application et n'apparaissait toujours qu'après l'animation. Ne pas y revenir.
          */
-        private const val ATTACHED_OVERLAY = false
+        private const val ATTACHED_OVERLAY = true
         /** Touche de dictée : mêmes proportions qu'une touche de la rangée du bas. */
         private const val KEY_W_DP = 56
         private const val KEY_H_DP = 44
@@ -143,6 +142,8 @@ class OverlayService : Service() {
     private var attachedId = 0
     /** Dernière géométrie de clavier placée (on ne repositionne que si elle change). */
     private var lastKb: Rect? = null
+    /** Instant où la fenêtre du clavier a été vue pour la première fois (diagnostic de latence). */
+    private var imeSeenMs = 0L
     /** Vrai quand le clavier était ouvert au dernier tick (une réouverture force un rattachement). */
     private var kbWasVisible = false
     private var posX = 0
@@ -206,16 +207,7 @@ class OverlayService : Service() {
                         // événements de focus `false` sur les champs custom, ce qui faisait clignoter
                         // la bulle hors de l'écran.
                         if (attachMode) return@post
-                        if (has) {
-                            // Le champ prend le focus AVANT que le clavier ne s'affiche : on pose la
-                            // bulle tout de suite à la dernière géométrie connue, donc elle est déjà
-                            // en place quand Gboard monte, au lieu d'apparaître après son animation.
-                            if (keyboard == null) keyboard = predictedKb()
-                            moveToKeyboard()
-                            reveal()
-                        } else if (keyboard == null) {
-                            root.visibility = View.GONE
-                        }
+                        if (has) moveToKeyboard() else if (keyboard == null) root.visibility = View.GONE
                     }
                 }.onFailure { Log.e("VXK", "focus failed", it) }
             }
@@ -334,7 +326,14 @@ class OverlayService : Service() {
         val visible = w.first.top < wm.currentWindowMetrics.bounds.height()
         if (!visible) {
             kbWasVisible = false
+            imeSeenMs = 0L
             return
+        }
+        // Diagnostic de latence : `ime seen` marque l'instant où la fenêtre du clavier apparaît,
+        // et les lignes `attach`/`reparent` donnent le retard réel avant que la bulle soit posée.
+        if (imeSeenMs == 0L) {
+            imeSeenMs = now
+            Log.d("VXK", "ime seen id=${w.second} top=${w.first.top} t=$now")
         }
         val sc = overlaySc
         when {
@@ -560,7 +559,7 @@ class OverlayService : Service() {
             root.visibility = View.VISIBLE
             // Hiérarchie reconstruite : la touche doit reprendre son état d'écoute en cours.
             keyView.active = recording
-            Log.d("VXK", "attach ok id=$id kb=$kb pos=$posX,$posY")
+            Log.d("VXK", "attach ok id=$id kb=$kb pos=$posX,$posY lag=${SystemClock.uptimeMillis() - imeSeenMs} t=${SystemClock.uptimeMillis()}")
         } catch (t: Throwable) {
             Log.e("VXK", "attach failed", t)
             lastAttachFailMs = now
@@ -578,7 +577,7 @@ class OverlayService : Service() {
             a11y.attachAccessibilityOverlayToWindow(id, sc)
             attachedId = id
             placeAttached(sc, kb)
-            Log.d("VXK", "reparent ok id=$id kb=$kb")
+            Log.d("VXK", "reparent ok id=$id kb=$kb lag=${SystemClock.uptimeMillis() - imeSeenMs} t=${SystemClock.uptimeMillis()}")
         } catch (t: Throwable) {
             Log.e("VXK", "reparent failed", t)
             // L'ancienne fenêtre est morte avec la surface : on repart d'un hôte neuf.
@@ -593,6 +592,7 @@ class OverlayService : Service() {
         attachedId = 0
         lastKb = null
         kbWasVisible = false
+        imeSeenMs = 0L
         if (sc != null) {
             try {
                 SurfaceControl.Transaction().reparent(sc, null).apply()
@@ -625,19 +625,6 @@ class OverlayService : Service() {
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
         lastKb = Rect(kb)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
-    }
-
-    /**
-     * Géométrie supposée du clavier avant la première mesure de la session.
-     *
-     * Gboard garde la même hauteur d'une fois sur l'autre ; 336 dp correspond à sa hauteur
-     * mesurée sur l'appareil de test (883 px à densité 420). Sert uniquement au tout premier
-     * champ touché après un démarrage : dès que le clavier est réellement lu, sa vraie zone
-     * remplace cette estimation.
-     */
-    private fun predictedKb(): Rect {
-        val b = wm.currentWindowMetrics.bounds
-        return Rect(0, b.height() - dp(336), b.width(), b.height())
     }
 
     private fun moveToKeyboard() {

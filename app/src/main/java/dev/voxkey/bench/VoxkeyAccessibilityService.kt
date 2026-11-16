@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 
@@ -62,6 +63,11 @@ class VoxkeyAccessibilityService : AccessibilityService() {
             // Ne jamais signaler « pas de clavier » sur la seule absence de champ éditable :
             // certaines apps (barre de recherche du launcher) ont un clavier sans nœud focalisable,
             // et la bulle disparaissait alors que le clavier était ouvert.
+            // Diagnostic de latence : l'heure de l'appui permet de mesurer le délai réel entre
+            // le toucher du champ et l'instant où la bulle est posée (`lag=` côté service).
+            if (event?.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
+                event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED
+            ) Log.d(TAG, "evt=${event?.eventType} t=${SystemClock.uptimeMillis()}")
             OverlayService.notifyKeyboard(imeBounds())
         }.onFailure { Log.w(TAG, "event failed", it) }
     }
