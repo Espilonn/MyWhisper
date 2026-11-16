@@ -118,11 +118,13 @@ class OverlayService : Service() {
     private var kbSeen = false
     /** Libération différée du modèle : annulée dès qu'une nouvelle dictée commence. */
     private val releaseModel = Runnable {
-        ParakeetEngine.release()
-        WhisperEngine.release()
+        runCatching { ParakeetEngine.release() }
+        runCatching { WhisperEngine.release() }
     }
     /** Dernière tentative de recréation de la fenêtre (anti-boucle). */
     private var lastReattachMs = 0L
+    /** Dernier échec d'attachement à la fenêtre du clavier (anti-boucle). */
+    private var lastAttachFailMs = 0L
 
     // Surcouche attachée à la fenêtre du clavier (API 34+) : elle est composée dans la fenêtre de
     // Gboard, donc elle suit ses animations sans polling ni recalage. Sinon, repli WindowManager.
@@ -143,6 +145,8 @@ class OverlayService : Service() {
 
     /** Texte actuellement présent dans le champ (thread principal seulement). */
     private var pushed = ""
+    /** Application active au début de la dictée : le texte n'est inséré que si on y est encore. */
+    private var startPkg: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -237,7 +241,9 @@ class OverlayService : Service() {
             try {
                 // Filet de sécurité pour une fenêtre détruite sans que le service le sache.
                 val now = SystemClock.uptimeMillis()
-                if (!root.isAttachedToWindow && now - lastReattachMs > 2000) {
+                // En mode attaché, `root` n'est pas dans une fenêtre `wm` : `reattach()` n'aurait
+                // qu'un effet, relâcher la surface toutes les 2 s et faire clignoter la bulle.
+                if (!attachMode && !root.isAttachedToWindow && now - lastReattachMs > 2000) {
                     lastReattachMs = now
                     reattach()
                 }
@@ -292,7 +298,15 @@ class OverlayService : Service() {
         // d'une application à l'autre, et une surface déjà en place glisse avec le clavier dès la
         // première image. La détacher obligeait à la reconstruire à chaque application, et la bulle
         // n'arrivait qu'une fois la géométrie finale publiée.
-        if (visible && (w.second != attachedId || overlaySc == null)) attachTo(w.second, w.first)
+        if (!visible) return
+        if (w.second != attachedId || overlaySc == null) {
+            attachTo(w.second, w.first)
+        } else if (root.visibility != View.VISIBLE) {
+            // Fin de dictée clavier fermé : `stopSession` a masqué la vue, mais la fenêtre du
+            // clavier survit avec le même id et la surface reste accrochée — rien ne remettait
+            // la vue en visible, donc la bulle ne revenait jamais à la réouverture du clavier.
+            reveal()
+        }
     }
 
     /** Repli quand la géométrie du clavier est introuvable : coin bas-gauche, au-dessus du clavier. */
@@ -356,11 +370,16 @@ class OverlayService : Service() {
         main.removeCallbacks(poll)
         running = false
         recording = false
-        keyView.active = false
+        // `onCreate` sort tôt quand la bulle est désactivée ou la permission absente : les vues
+        // n'existent alors pas, et toucher un `lateinit` ici tuait le processus (crash à la
+        // désactivation de la bulle dans les Réglages).
+        if (this::keyView.isInitialized) keyView.active = false
         detachBubble()
-        try {
-            wm.removeView(root)
-        } catch (_: Exception) {
+        if (this::wm.isInitialized && this::root.isInitialized) {
+            try {
+                wm.removeView(root)
+            } catch (_: Exception) {
+            }
         }
         main.removeCallbacksAndMessages(null)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -459,27 +478,38 @@ class OverlayService : Service() {
      */
     private fun attachTo(id: Int, kb: Rect) {
         val a11y = VoxkeyAccessibilityService.instance ?: return
+        val now = SystemClock.uptimeMillis()
+        // Un attachement qui échoue était retenté à chaque tick (20 fois par seconde), en créant
+        // une surface à chaque fois : elle restait vivante à la sortie de `attachTo` (le `catch`
+        // appelait `detachBubble`, qui ne connaît pas l'hôte local) et la bulle clignotait.
+        if (now - lastAttachFailMs < 500) return
         detachBubble()
         // Une View ne peut appartenir qu'à un seul hôte, et `release()` ne la détache pas : la
         // réutiliser faisait échouer silencieusement le second attachement (bulle perdue à la
         // réouverture du clavier). On reconstruit donc la hiérarchie à chaque fois.
         buildViews()
+        var vh: SurfaceControlViewHost? = null
         try {
             val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
-            val vh = SurfaceControlViewHost(this, display, null as IBinder?)
-            vh.setView(root, SurfaceControlViewHost.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP), false))
-            val sc = vh.surfacePackage?.surfaceControl ?: run { vh.release(); return }
+            val hostView = SurfaceControlViewHost(this, display, null as IBinder?)
+            vh = hostView
+            hostView.setView(root, SurfaceControlViewHost.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP), false))
+            val sc = hostView.surfacePackage?.surfaceControl ?: run { hostView.release(); return }
             // La surface du ViewHost naît masquée (cf. test CTS) : l'allumer explicitement.
             SurfaceControl.Transaction().setVisibility(sc, true).apply()
             a11y.attachAccessibilityOverlayToWindow(id, sc)
             placeAttached(sc, kb)
-            host = vh
+            host = hostView
             overlaySc = sc
             attachedId = id
             root.visibility = View.VISIBLE
+            // Hiérarchie reconstruite : la touche doit reprendre son état d'écoute en cours.
+            keyView.active = recording
             Log.d("VXK", "attach ok id=$id kb=$kb pos=$posX,$posY")
         } catch (t: Throwable) {
             Log.e("VXK", "attach failed", t)
+            lastAttachFailMs = now
+            vh?.release()
             detachBubble()
         }
     }
@@ -538,18 +568,33 @@ class OverlayService : Service() {
     // ----------------------------------------------------------- dictée
 
     private fun toggleRecording() {
+        // Une dictée est encore en cours de transcription : en démarrer une autre ferait écrire
+        // deux textes dans le même champ (le résultat précédent arrive après).
+        if (!recording && keyView.busy) return
         if (recording) stopSession() else startSession()
     }
 
     private fun startSession() {
         pushed = ""
-
-        startForeground(
-            NOTIF_ID, notification(getString(R.string.notif_dictating)),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-        )
-
-        recorder = Recorder().also { it.start() }
+        startPkg = VoxkeyAccessibilityService.instance?.activePackage()
+        // `startForeground` (type micro) et l'ouverture du micro peuvent échouer : permission
+        // retirée, micro pris par une autre application, démarrage refusé en arrière-plan.
+        // Sans ce filet, l'exception remontait au gestionnaire de clic et tuait le processus.
+        try {
+            startForeground(
+                NOTIF_ID, notification(getString(R.string.notif_dictating)),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+            recorder = Recorder().also { it.start() }
+        } catch (t: Throwable) {
+            Log.e("VXK", "start failed", t)
+            runCatching { recorder?.stop() }
+            recorder = null
+            runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+            key.background = keyBackground(active = false)
+            keyView.active = false
+            return
+        }
         recording = true
 
         // Le chargement (2 s pour parakeet q8) se fait pendant la dictée, plus au stop.
@@ -588,7 +633,11 @@ class OverlayService : Service() {
     private fun preloadModel() {
         val model = selectedModelPath() ?: return
         thread(name = "voxkey-load") {
-            if (isParakeetModel(model)) ParakeetEngine.ensure(model) else WhisperEngine.ensure(model)
+            // Un modèle absent ou corrompu lève ici ; sans filet, le thread non capturé tuait
+            // le processus, donc la bulle.
+            runCatching {
+                if (isParakeetModel(model)) ParakeetEngine.ensure(model) else WhisperEngine.ensure(model)
+            }.onFailure { Log.e("VXK", "preload failed", it) }
         }
     }
 
@@ -599,7 +648,12 @@ class OverlayService : Service() {
 
         val rec = recorder
         recorder = null
-        val raw = rec?.stop() ?: FloatArray(0)
+        val raw = try {
+            rec?.stop() ?: FloatArray(0)
+        } catch (t: Throwable) {
+            Log.e("VXK", "stop failed", t)
+            FloatArray(0)
+        }
         val pcm = Dsp.bandpass(raw)
 
         keyView.busy = true
@@ -625,18 +679,29 @@ class OverlayService : Service() {
                 main.post {
                     keyView.busy = false
                     if (finalText.isNotBlank()) {
-                        // la transcription finale remplace exactement ce qui a été inséré
-                        if (VoxkeyAccessibilityService.instance?.replaceText(pushed, finalText) != true) {
-                            VoxkeyAccessibilityService.instance?.paste(finalText)
+                        val a11y = VoxkeyAccessibilityService.instance
+                        // Même application qu'au départ seulement : sinon, après un changement
+                        // d'écran pendant la transcription, le texte atterrit dans le champ d'une
+                        // autre app. Le texte reste de toute façon dans l'historique.
+                        val sameApp = startPkg == null || a11y?.activePackage() == startPkg
+                        if (a11y != null && sameApp) {
+                            // la transcription finale remplace exactement ce qui a été inséré
+                            if (!a11y.replaceText(pushed, finalText)) a11y.paste(finalText)
+                            pushed = finalText
+                        } else {
+                            Log.d("VXK", "insert skipped start=$startPkg now=${a11y?.activePackage()}")
                         }
-                        pushed = finalText
                     }
                     overlayStopForeground()
                     if (!VoxkeyAccessibilityService.hasTextField) root.visibility = View.GONE
                     main.postDelayed(releaseModel, 60_000)
                 }
             }
-            if (finalText.isNotBlank()) Store.addDictation(finalText)
+            // Une exception ici tuerait le processus (thread sans filet) : plus de bulle du tout.
+            if (finalText.isNotBlank()) {
+                runCatching { Store.addDictation(finalText) }
+                    .onFailure { Log.e("VXK", "history failed", it) }
+            }
         }
     }
 

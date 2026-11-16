@@ -76,6 +76,9 @@ class VoxkeyAccessibilityService : AccessibilityService() {
         return if (node.isEditable && node.isEnabled) node else null
     }
 
+    /** Application au premier plan : sert à ne pas écrire dans le champ d'une autre app. */
+    fun activePackage(): String? = runCatching { rootInActiveWindow?.packageName?.toString() }.getOrNull()
+
     /** Remplace, dans le champ actif, l'occurrence de [old] par [new], sans toucher au reste.
      *  Cherche [old] dans le texte courant ; à défaut, écrit [new] à la position du curseur.
      *

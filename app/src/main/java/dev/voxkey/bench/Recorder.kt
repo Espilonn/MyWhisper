@@ -88,9 +88,11 @@ class Recorder {
 
     fun stop(): FloatArray {
         running = false
-        worker?.join()
-        record?.stop()
-        record?.release()
+        // Arrêter la capture AVANT le `join` : un `read` en cours ne rendrait pas la main, et
+        // `stop()` est appelé sur le thread principal — l'interface se figeait.
+        runCatching { record?.stop() }
+        worker?.join(500)
+        runCatching { record?.release() }
         record = null
         return snapshot()
     }
