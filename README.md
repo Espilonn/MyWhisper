@@ -1,148 +1,139 @@
 # MyWisper
 
-Dictée vocale **100 % hors ligne** sur Android. Pas de clavier à installer : une bulle se
-colle au-dessus de la barre d'espace de Gboard et écrit le texte dicté directement dans le
-champ actif.
+Dictation that never leaves your phone.
 
-Aucun audio ne quitte le téléphone : la transcription tourne en local sur le CPU, avec
-[NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF) quantisé.
+MyWisper is a small personal Android project: a voice-typing key that sits above Gboard's
+space bar, in the spirit of **Nothing's Essential Voice** — tap it, talk, tap again and the
+text is written into whatever field you were in. Recognition runs entirely on the device
+with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
+quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.0.0**. APK signé (6 Mo, arm64, Android 12+) : [Releases](https://github.com/EspiIon/MyWisper/releases/latest). Les identifiants internes (`dev.voxkey.bench`,
-> base `voxkey.db`, préférences `voxkey`) datent du nom de travail « voxkey » et n'ont pas
-> encore été migrés — les renommer créerait une seconde application et imposerait de
-> retélécharger les modèles.
+> Version **1.1.1**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/EspiIon/MyWisper/releases/latest).
+> The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
+> from the working name "voxkey" and have not been migrated — renaming them would create a second
+> app and force a model re-download.
 
-## Ce que ça fait
+## Features
 
-- **Bulle accrochée au clavier** — appui pour dicter, appui pour arrêter. La bulle suit la
-  fenêtre de Gboard (`SurfaceControlViewHost`, API 34+ ; repli `WindowManager` sur les
-  versions antérieures).
-- **Écriture dans n'importe quelle application** — via un service d'accessibilité, qui
-  insère le texte dans le champ qui a le focus.
-- **Mots-clés** — une abréviation (`auj`) devient son texte complet (`aujourd'hui`) à
-  l'insertion.
-- **Dictionnaire** — vocabulaire personnel (noms propres, termes techniques) ajouté à la
-  main. Il n'est pas encore transmis au moteur : c'est une liste, pas une correction.
-- **Historique** — dictées enregistrées, avec leur nombre de mots, consultation et
-  suppression.
-- **Accueil** — total de mots, comparaison avec la période précédente, et une grille de
-  jours façon contributions GitHub (plus le carré est sombre, plus la journée a produit de
-  mots) ; un appui sur un carré donne le détail du jour.
-- **Couleur d'accent réglable** — jaune par défaut, au choix dans les réglages ; la teinte
-  s'applique à toute l'application et à la bulle.
+- **A voice key, not a keyboard.** A 56 × 44 dp bubble is attached to the keyboard window, at the
+  left end of the space bar. Nothing to install or switch to: it appears with Gboard and disappears
+  with it.
+- **Tap to talk, tap to transcribe.** First tap starts recording, second tap stops and transcribes.
+  The result is written at the cursor of the focused field, in any app.
+- **History.** Every dictation is stored locally with its date and word count; browse, reread or
+  delete it.
+- **Usage graph.** Words per day over a week, a month or six months — a contribution-style grid,
+  a total, the change versus the previous period, and the detail of any day you tap.
+- **Keywords.** A spoken abbreviation (`sig`) becomes its full saved text (`Best regards, Alex`),
+  but only when dictated on its own, so ordinary words are never rewritten mid-sentence.
+- **Dictionary.** Your own names, brands and technical terms, kept on the phone as a list.
+  It is not yet fed to the model — it is a reference list, not a correction pass.
+- **Adjustable accent colour.** Yellow by default; the whole app and the bubble follow the choice.
+- **Bilingual UI.** French and English; the app follows the system language (French is the
+  default when the locale is neither).
 
-## Comment ça marche
+## How it works
 
 ```
-Gboard (clavier système)
-  └─ bulle MyWisper, ancrée à la fenêtre du clavier
-        │  appui
+Gboard (system keyboard)
+  └─ MyWisper key, attached to the keyboard window
+        │  tap
         ▼
-OverlayService (service de premier plan, type microphone)
-        │  AudioRecord 16 kHz mono → PCM flottant
+OverlayService (foreground service, microphone type)
+        │  AudioRecord 16 kHz mono → float PCM
         ▼
 ParakeetEngine (JNI → ggml / whisper.cpp)
-        │  texte
+        │  text
         ▼
 VoxkeyAccessibilityService
-        └─ insertion dans le champ actif
+        └─ written into the focused field
 ```
 
-Le fichier de modèle choisi dans les réglages décide du moteur : un fichier Parakeet est
-traité par `ParakeetEngine`, un fichier Whisper (ggml) par `WhisperEngine`. Seuls les
-modèles Parakeet sont proposés au téléchargement.
+Three ideas carry the whole thing:
 
-Le modèle est chargé au début de la dictée et libéré 60 s après la fin : il ne reste pas en
-mémoire quand l'application n'est pas utilisée.
+1. **The key is a surface grafted onto the keyboard window** (`SurfaceControlViewHost`,
+   `attachAccessibilityOverlayToWindow`). It therefore moves, appears and vanishes *with* Gboard,
+   stays above it, and needs no draw-over-other-apps permission in that mode. The vertical position
+   is computed in the keyboard window's frame, so Gboard's opening animation cannot disturb it.
+2. **Text insertion goes through an accessibility service**, which sets the text of the focused
+   node (with clipboard + paste as a fallback). That is what makes it work in any app rather than
+   only in apps written for it.
+3. **The model is loaded while you speak**, then freed 60 s after the dictation. Encoder time is
+   therefore hidden behind recording, which is why everyday use feels almost instant.
 
-## Modèles
+A model file's kind selects the engine: a Parakeet file goes to `ParakeetEngine`, a Whisper ggml
+file to `WhisperEngine`. Only Parakeet models are offered for download in the app.
 
-Téléchargés depuis Hugging Face vers le stockage privé de l'application, avec reprise par
-fichier `.part` :
+## Models
 
-| Fichier | Taille | Usage |
+Downloaded from Hugging Face into the app's private storage, resumable via a `.part` file:
+
+| File | Size | Use |
 |---|---|---|
-| `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | 415 Mo | par défaut, le plus rapide |
-| `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | 668 Mo | plus précis, plus lourd |
+| `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | 415 MB | default, the fastest |
+| `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | 668 MB | more accurate, heavier |
+
+No Q6_K exists upstream; Q8_0 is the next quality step. Only one ABI is shipped (`arm64-v8a`).
 
 ## Performance
 
-Mesures sur Nothing Phone (3a), Snapdragon 7s Gen 3, 4 threads, modèle Parakeet Q4_K :
+Measured on a Nothing Phone (3a), Snapdragon 7s Gen 3, 4 threads, Parakeet Q4_K:
 
-| | Durée |
+| | Time |
 |---|---|
-| Transcription de 11 s d'audio | **1,5 s** (encodeur 1,21-1,39 s, décodeur 3 ms) |
-| Rapport au temps réel (RTF) | **0,14** — environ 7× plus vite que l'audio |
-| Chargement du modèle | 0,5 à 1,1 s selon la passe (fichier déjà en cache page) |
+| Transcribing 11 s of audio | **1.5 s** (encoder 1.21–1.39 s, decoder 3 ms) |
+| Real-time factor | **0.14** — about 7× faster than the audio |
+| Model load | 0.5–1.1 s depending on the pass (file already in the page cache) |
 
-Deux passes successives donnent 1 522 ms et 1 544 ms, soit 1,4 % d'écart : le chiffre tient.
-L'encodeur représente plus de 95 % du temps, le décodage est négligeable. Le modèle se
-charge **pendant** la dictée, donc l'attente après l'arrêt se rapproche de l'encodage seul —
-c'est pour ça que l'usage courant paraît quasi instantané.
+Two successive runs gave 1,522 ms and 1,544 ms — a 1.4 % spread, so the figure holds. The encoder
+accounts for more than 95 % of the time; decoding is negligible. Because the model loads *during*
+the dictation, the wait after stopping is close to encoding alone.
 
-> Ces valeurs viennent du chronométrage interne du moteur (encodeur/décodeur lus dans
-> `parakeet_get_timings()`, horloge autour de l'appel complet) ; l'app les affiche et les
-> enregistre via son banc d'essai. Méthode : [docs/benchmark.md](docs/benchmark.md).
-> Pistes écartées : [docs/decisions.md](docs/decisions.md).
+> These numbers come from the engine's own timing (`parakeet_get_timings()`, clock around the whole
+> call); the app shows and records them in its benchmark screen. Method:
+> [docs/benchmark.md](docs/benchmark.md). Rejected options: [docs/decisions.md](docs/decisions.md).
 
-## Construire
+## Install
 
-Prérequis : JDK 21, Android SDK (compileSdk 37), NDK `28.2.13676358`, et le sous-module.
+1. Open MyWisper and download a model (415 MB for Q4_K).
+2. Allow overlay, microphone and notifications.
+3. Enable the MyWisper accessibility service — without it, no text can be typed into other apps.
+4. Open a text field: the key appears above the keyboard.
 
-```bash
-git clone --recursive https://github.com/EspiIon/MyWisper.git
-cd MyWisper
-export JAVA_HOME=~/.jdks/jbr-21.0.11
-./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
+Remote install (device on the same tailnet): [docs/remote-install.md](docs/remote-install.md).
 
-- Kotlin, **Views programmatiques** (pas de Compose) et **aucune dépendance de production** :
-  les seules dépendances sont de test (`junit`, `androidx.test`).
-- Native : `app/src/main/cpp` (CMake) au-dessus du sous-module `third_party/whisper.cpp`,
-  épinglé sur `v1.9.5`. Une seule ABI : `arm64-v8a`.
-- `VOXKEY_VULKAN=OFF` dans `app/build.gradle.kts` : le backend Vulkan s'est révélé plus lent
-  que le CPU sur Adreno.
+## Limitations
 
-## Installer sur le téléphone
+- **Google Play**: writing into other apps through an accessibility service is not allowed there.
+  Distribution goes through an APK, F-Droid or Obtainium — or a real `InputMethodService`, which
+  does not exist yet.
+- **Android 12+** required (`minSdk 31`).
+- The key is anchored to Gboard's window; other keyboards have not been validated.
+- Each dictation pays the model load first (0.5–1.1 s, hidden by recording), then about
+  0.15 × the audio duration.
+- No licence yet: the code is public but all rights reserved. The `third_party/whisper.cpp`
+  submodule keeps its MIT licence.
 
-1. Ouvrir **MyWisper**, télécharger un modèle (415 Mo pour Q4_K).
-2. Autoriser la superposition, le micro et les notifications.
-3. Activer le service d'accessibilité MyWisper (sans lui, le texte ne peut pas être écrit
-   dans les autres applications).
-4. Ouvrir un champ de texte : la bulle apparaît au-dessus du clavier.
+## Roadmap
 
-Installation à distance (appareil sur le même tailnet) :
-[docs/remote-install.md](docs/remote-install.md).
+- **Stability** of the bubble: attaching the surface to every keyboard opening, surviving service
+  restarts and reinstalls without losing permissions.
+- **Bring your own model**: pick a local GGUF/ggml file instead of downloading one from the list.
+- *Maybe*: spell-and-grammar correction of existing text, rather than only dictating new text.
 
-## Limites connues
-
-- **Google Play** : l'écriture dans les autres applications par un service d'accessibilité
-  y est interdite. La distribution passerait par un APK, F-Droid ou Obtainium — ou par un
-  véritable `InputMethodService`, qui n'est pas encore écrit.
-- **Android 12+** requis (`minSdk 31`).
-- La bulle s'ancre sur la fenêtre de Gboard ; un autre clavier n'a pas été validé.
-- Chaque dictée coûte d'abord le chargement du modèle (0,5 à 1,1 s, masqué par le fait qu'il
-  démarre en même temps que l'enregistrement), puis environ 0,15 × la durée de l'audio.
-
-## Structure
+## Project layout
 
 ```
 app/src/main/java/dev/voxkey/bench/
-  OverlayService.kt            bulle, enregistrement, cycle du modèle
-  VoxkeyAccessibilityService.kt  insertion dans le champ actif
-  ParakeetEngine.kt            moteur principal (GGUF, JNI)
-  WhisperEngine.kt             moteur Whisper (ggml)
-  ModelCatalog.kt              téléchargement des modèles
-  Store.kt                     SQLite : dictées, vocabulaire, mots-clés
-  MainActivity.kt / *Screen.kt  navigation et écrans
-  Ui.kt / Accent.kt            système visuel et couleur d'accent
-  DayGrid.kt                   grille de jours façon contributions
-app/src/main/cpp/              JNI + CMake vers whisper.cpp
-docs/                          décisions, mesures, installation à distance
+  OverlayService.kt              bubble, recording, model lifecycle
+  VoxkeyAccessibilityService.kt  insertion into the focused field
+  ParakeetEngine.kt              main engine (GGUF, JNI)
+  WhisperEngine.kt               Whisper engine (ggml)
+  ModelCatalog.kt                model download
+  Store.kt                       SQLite: dictations, dictionary, keywords
+  MainActivity.kt / *Screen.kt   navigation and screens
+  Ui.kt / Accent.kt              design system and accent colour
+  DayGrid.kt                     contribution-style day grid
+app/src/main/cpp/                JNI + CMake over whisper.cpp
+docs/                            decisions, measurements, remote install
 ```
-
-## Licence
-
-Pas encore de licence : le code est public mais tous droits réservés. Le sous-module
-`third_party/whisper.cpp` conserve sa licence MIT.
