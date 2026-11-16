@@ -58,13 +58,15 @@ class OverlayService : Service() {
 
         /**
          * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`), essai de la branche
-         * `exp/attached-overlay`. Désactivée : à la réouverture du clavier la surface restait
-         * invisible (le système réutilise l'id de fenêtre IME, la surface survit au clavier fermé
-         * et la couche se retrouve sous le clavier), et chaque attachement laissait une surface
-         * orpheline. Le repli fenêtre `TYPE_ACCESSIBILITY_OVERLAY` est stable : la bulle nous
-         * appartient, on la montre et on la masque nous-mêmes.
+         * `exp/attached-overlay`. Désactivée, et cette fois pour de bon : la surface meurt avec la
+         * fenêtre du clavier et le système réutilise le même id, donc il fallait la rattacher à
+         * chaque ouverture — d'où un délai visible entre l'appui dans le champ et la bulle.
+         * La fenêtre `TYPE_ACCESSIBILITY_OVERLAY` n'a pas ce problème : elle nous appartient, ne
+         * dépend d'aucune fenêtre du clavier, et on la place **avant** l'animation à la dernière
+         * géométrie connue du clavier (voir `predictedKb`). Le code de la surface reste derrière ce
+         * drapeau : il compile et ne sert plus.
          */
-        private const val ATTACHED_OVERLAY = true
+        private const val ATTACHED_OVERLAY = false
         /** Touche de dictée : mêmes proportions qu'une touche de la rangée du bas. */
         private const val KEY_W_DP = 56
         private const val KEY_H_DP = 44
@@ -204,7 +206,16 @@ class OverlayService : Service() {
                         // événements de focus `false` sur les champs custom, ce qui faisait clignoter
                         // la bulle hors de l'écran.
                         if (attachMode) return@post
-                        if (has) moveToKeyboard() else if (keyboard == null) root.visibility = View.GONE
+                        if (has) {
+                            // Le champ prend le focus AVANT que le clavier ne s'affiche : on pose la
+                            // bulle tout de suite à la dernière géométrie connue, donc elle est déjà
+                            // en place quand Gboard monte, au lieu d'apparaître après son animation.
+                            if (keyboard == null) keyboard = predictedKb()
+                            moveToKeyboard()
+                            reveal()
+                        } else if (keyboard == null) {
+                            root.visibility = View.GONE
+                        }
                     }
                 }.onFailure { Log.e("VXK", "focus failed", it) }
             }
@@ -614,6 +625,19 @@ class OverlayService : Service() {
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
         lastKb = Rect(kb)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
+    }
+
+    /**
+     * Géométrie supposée du clavier avant la première mesure de la session.
+     *
+     * Gboard garde la même hauteur d'une fois sur l'autre ; 336 dp correspond à sa hauteur
+     * mesurée sur l'appareil de test (883 px à densité 420). Sert uniquement au tout premier
+     * champ touché après un démarrage : dès que le clavier est réellement lu, sa vraie zone
+     * remplace cette estimation.
+     */
+    private fun predictedKb(): Rect {
+        val b = wm.currentWindowMetrics.bounds
+        return Rect(0, b.height() - dp(336), b.width(), b.height())
     }
 
     private fun moveToKeyboard() {
