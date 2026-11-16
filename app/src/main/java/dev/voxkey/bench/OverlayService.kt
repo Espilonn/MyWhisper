@@ -57,6 +57,16 @@ class OverlayService : Service() {
         private const val HIDE_GRACE_MS = 400L
         private const val ATTACH_GRACE_MS = 2500L
 
+        /**
+         * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`), essai de la branche
+         * `exp/attached-overlay`. Désactivée : à la réouverture du clavier la surface restait
+         * invisible (le système réutilise l'id de fenêtre IME, la surface survit au clavier fermé
+         * et la couche se retrouve sous le clavier), et chaque attachement laissait une surface
+         * orpheline. Le repli fenêtre `TYPE_ACCESSIBILITY_OVERLAY` est stable : la bulle nous
+         * appartient, on la montre et on la masque nous-mêmes.
+         */
+        private const val ATTACHED_OVERLAY = false
+
         /** Touche de dictée : mêmes proportions qu'une touche de la rangée du bas. */
         private const val KEY_W_DP = 56
         private const val KEY_H_DP = 44
@@ -134,7 +144,7 @@ class OverlayService : Service() {
     private var posX = 0
     private var posY = 0
     private val attachMode: Boolean
-        get() = Build.VERSION.SDK_INT >= 34 && VoxkeyAccessibilityService.instance != null
+        get() = ATTACHED_OVERLAY && Build.VERSION.SDK_INT >= 34 && VoxkeyAccessibilityService.instance != null
     private val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
@@ -172,17 +182,26 @@ class OverlayService : Service() {
         focusListener = { has ->
             Log.d("VXK", "focus-> $has (recording=$recording)")
             main.post {
-                hiddenByFocus = !has
-                if (!recording) {
-                    // Ne pas masquer tant qu'un clavier est à l'écran : les ROM envoient des
-                    // événements de focus `false` sur les champs custom, ce qui faisait clignoter
-                    // la bulle hors de l'écran.
-                    if (attachMode) return@post
-                    if (has) moveToKeyboard() else if (keyboard == null) root.visibility = View.GONE
-                }
+                // Ces deux écouteurs arrivent sur le thread principal : sans filet, une vue
+                // détachée (`updateViewLayout` sur une fenêtre morte, vue ci-dessous) tuait le
+                // processus — la bulle ne revenait alors qu'en relançant l'application.
+                runCatching {
+                    hiddenByFocus = !has
+                    if (!recording) {
+                        // Ne pas masquer tant qu'un clavier est à l'écran : les ROM envoient des
+                        // événements de focus `false` sur les champs custom, ce qui faisait clignoter
+                        // la bulle hors de l'écran.
+                        if (attachMode) return@post
+                        if (has) moveToKeyboard() else if (keyboard == null) root.visibility = View.GONE
+                    }
+                }.onFailure { Log.e("VXK", "focus failed", it) }
             }
         }
-        keyboardListener = { bounds -> main.post { onKeyboardRead(bounds) } }
+        keyboardListener = { bounds ->
+            main.post {
+                runCatching { onKeyboardRead(bounds) }.onFailure { Log.e("VXK", "kb failed", it) }
+            }
+        }
         Log.d("VXK", "overlay created, a11y=${VoxkeyAccessibilityService.instance != null} text=${VoxkeyAccessibilityService.hasTextField}")
         main.post(poll)
     }
@@ -434,8 +453,15 @@ class OverlayService : Service() {
         // En mode attaché, la vue n'entre dans aucune fenêtre ici : elle sera hébergée par la
         // surface attachée au clavier, à l'ouverture de celui-ci.
         if (!attachMode) {
-            wm.addView(root, params)
-            root.visibility = View.GONE
+            // `addView` peut échouer (jeton d'accessibilité mort) : sans filet, l'exception
+            // remontait à `onCreate` et tuait le processus du service, donc la bulle pour de bon.
+            try {
+                wm.addView(root, params)
+                root.visibility = View.GONE
+                Log.d("VXK", "window added type=${params.type} a11y=${VoxkeyAccessibilityService.instance != null}")
+            } catch (t: Throwable) {
+                Log.e("VXK", "window add failed", t)
+            }
         }
     }
 
@@ -551,6 +577,8 @@ class OverlayService : Service() {
 
     private fun moveToKeyboard() {
         val kb = keyboard ?: return
+        // Fenêtre morte ou pas encore posée : `updateViewLayout` lèverait.
+        if (!this::root.isInitialized || !root.isAttachedToWindow) return
         val metrics = wm.currentWindowMetrics
         val screenBottom = metrics.bounds.height()
         val nav = metrics.windowInsets.getInsets(WindowInsets.Type.navigationBars()).bottom

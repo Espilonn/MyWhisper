@@ -48,28 +48,35 @@ class VoxkeyAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) return
-        val has = focusedEditable() != null
-        if (has != hasTextField) {
-            hasTextField = has
-            Log.d(TAG, "focus=$has")
-            OverlayService.notifyFocus(has)
-        }
-        // le clavier peut apparaître/disparaître/bouger (rotation, thème, suggestions).
-        // Ne jamais signaler « pas de clavier » sur la seule absence de champ éditable :
-        // certaines apps (barre de recherche du launcher) ont un clavier sans nœud focalisable,
-        // et la bulle disparaissait alors que le clavier était ouvert.
-        OverlayService.notifyKeyboard(imeBounds())
+        // `windows` et `rootInActiveWindow` lèvent un `IllegalStateException` quand la connexion
+        // d'accessibilité est en train de tomber (changement d'application, réveil) : l'exception
+        // traversait ce rappel et tuait le processus, donc la bulle jusqu'au prochain lancement.
+        runCatching {
+            val has = focusedEditable() != null
+            if (has != hasTextField) {
+                hasTextField = has
+                Log.d(TAG, "focus=$has")
+                OverlayService.notifyFocus(has)
+            }
+            // le clavier peut apparaître/disparaître/bouger (rotation, thème, suggestions).
+            // Ne jamais signaler « pas de clavier » sur la seule absence de champ éditable :
+            // certaines apps (barre de recherche du launcher) ont un clavier sans nœud focalisable,
+            // et la bulle disparaissait alors que le clavier était ouvert.
+            OverlayService.notifyKeyboard(imeBounds())
+        }.onFailure { Log.w(TAG, "event failed", it) }
     }
 
     /** Rectangle du clavier à l'écran, ou null si aucun clavier n'est affiché. */
-    fun imeBounds(): Rect? = windows
-        .firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-        ?.let { w -> Rect().also { w.getBoundsInScreen(it) } }
+    fun imeBounds(): Rect? = runCatching {
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            ?.let { w -> Rect().also { w.getBoundsInScreen(it) } }
+    }.getOrNull()
 
     /** Zone et id de la fenêtre du clavier (l'id sert à y attacher une surcouche). */
-    fun imeWindow(): Pair<Rect, Int>? = windows
-        .firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-        ?.let { w -> Pair(Rect().also { w.getBoundsInScreen(it) }, w.id) }
+    fun imeWindow(): Pair<Rect, Int>? = runCatching {
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            ?.let { w -> Pair(Rect().also { w.getBoundsInScreen(it) }, w.id) }
+    }.getOrNull()
 
     private fun focusedEditable(): AccessibilityNodeInfo? {
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
