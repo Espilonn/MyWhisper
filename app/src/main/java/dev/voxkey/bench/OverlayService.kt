@@ -55,7 +55,6 @@ class OverlayService : Service() {
         private const val SETTLE_MS = 16L
         /** Délai avant de masquer la touche quand le clavier n'est plus lu du tout. */
         private const val HIDE_GRACE_MS = 400L
-        private const val ATTACH_GRACE_MS = 2500L
 
         /**
          * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`), essai de la branche
@@ -65,8 +64,7 @@ class OverlayService : Service() {
          * orpheline. Le repli fenêtre `TYPE_ACCESSIBILITY_OVERLAY` est stable : la bulle nous
          * appartient, on la montre et on la masque nous-mêmes.
          */
-        private const val ATTACHED_OVERLAY = false
-
+        private const val ATTACHED_OVERLAY = true
         /** Touche de dictée : mêmes proportions qu'une touche de la rangée du bas. */
         private const val KEY_W_DP = 56
         private const val KEY_H_DP = 44
@@ -141,10 +139,21 @@ class OverlayService : Service() {
     private var host: SurfaceControlViewHost? = null
     private var overlaySc: SurfaceControl? = null
     private var attachedId = 0
+    /** Dernière géométrie de clavier placée (on ne repositionne que si elle change). */
+    private var lastKb: Rect? = null
+    /** Vrai quand le clavier était ouvert au dernier tick (une réouverture force un rattachement). */
+    private var kbWasVisible = false
     private var posX = 0
     private var posY = 0
     private val attachMode: Boolean
-        get() = ATTACHED_OVERLAY && Build.VERSION.SDK_INT >= 34 && VoxkeyAccessibilityService.instance != null
+        get() = canAttach && VoxkeyAccessibilityService.instance != null
+
+    /** Greffage possible sur la fenêtre du clavier : API 34+, et seulement si on l'a choisi.
+     *  Décision indépendante de la connexion d'accessibilité : `buildViews` doit savoir s'il
+     *  pose une fenêtre WindowManager ou non, et la connexion arrive souvent après `onCreate`.
+     *  Poser la fenêtre puis greffer laissait la première orpheline à l'écran. */
+    private val canAttach: Boolean
+        get() = ATTACHED_OVERLAY && Build.VERSION.SDK_INT >= 34
     private val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
@@ -176,6 +185,9 @@ class OverlayService : Service() {
         // Fenêtres posées via le service d'accessibilité : elles passent au-dessus du clavier.
         wm = (VoxkeyAccessibilityService.instance ?: this).getSystemService(WINDOW_SERVICE) as WindowManager
         buildViews()
+        // Hôte préparé dès le démarrage : à la première ouverture du clavier, il ne reste plus
+        // qu'à accrocher la surface, au lieu de gonfler les vues et de créer l'hôte à ce moment.
+        if (canAttach) runCatching { ensureHost() }.onFailure { Log.e("VXK", "host failed", it) }
         running = true
 
         // Pas de visibilité ici : `onKeyboardRead` et `poll` en sont les seuls propriétaires.
@@ -262,7 +274,7 @@ class OverlayService : Service() {
                 val now = SystemClock.uptimeMillis()
                 // En mode attaché, `root` n'est pas dans une fenêtre `wm` : `reattach()` n'aurait
                 // qu'un effet, relâcher la surface toutes les 2 s et faire clignoter la bulle.
-                if (!attachMode && !root.isAttachedToWindow && now - lastReattachMs > 2000) {
+                if (!canAttach && !root.isAttachedToWindow && now - lastReattachMs > 2000) {
                     lastReattachMs = now
                     reattach()
                 }
@@ -299,33 +311,31 @@ class OverlayService : Service() {
      * sans valeur intermédiaire), donc attendre le tick suivant ne fait qu'ajouter du retard.
      */
     private fun checkIme(now: Long, src: String) {
-        // Seul travail : suivre l'identité de la fenêtre du clavier. La position et la visibilité
-        // sont portées par la fenêtre parente.
-        val w = (VoxkeyAccessibilityService.instance ?: return).imeWindow()
-        if (w == null) {
-            // `imeWindow()` renvoie null par intermittence même clavier ouvert : détacher trop
-            // tôt faisait disparaître la bulle en pleine saisie.
-            if (now - lastKbMs > ATTACH_GRACE_MS) detachBubble()
+        // La surface suit la fenêtre du clavier : elle apparaît, glisse et disparaît avec elle.
+        // Une fois posée, on n'y touche plus — la détacher puis la reconstruire à chaque
+        // ouverture était ce qui la rendait invisible (l'ancienne surface restait attachée à une
+        // fenêtre morte avec le même id).
+        val a11y = VoxkeyAccessibilityService.instance ?: return
+        val w = a11y.imeWindow() ?: return
+        val visible = w.first.top < wm.currentWindowMetrics.bounds.height() - 150
+        if (!visible) {
+            kbWasVisible = false
             return
         }
-        lastKbMs = now
-        // La fenêtre IME survit clavier fermé (elle glisse sous l'écran : bornes à ~2300..3260 au
-        // lieu de 1509..2392), et le système réutilise le même id d'une application à l'autre :
-        // un id inchangé ne prouve pas que la surface est encore accrochée à une fenêtre vivante.
-        val visible = w.first.top < wm.currentWindowMetrics.bounds.height() - 300
-        // On ne détache pas quand le clavier se ferme : la fenêtre de Gboard est unique et persiste
-        // d'une application à l'autre, et une surface déjà en place glisse avec le clavier dès la
-        // première image. La détacher obligeait à la reconstruire à chaque application, et la bulle
-        // n'arrivait qu'une fois la géométrie finale publiée.
-        if (!visible) return
-        if (w.second != attachedId || overlaySc == null) {
-            attachTo(w.second, w.first)
-        } else if (root.visibility != View.VISIBLE) {
-            // Fin de dictée clavier fermé : `stopSession` a masqué la vue, mais la fenêtre du
-            // clavier survit avec le même id et la surface reste accrochée — rien ne remettait
-            // la vue en visible, donc la bulle ne revenait jamais à la réouverture du clavier.
-            reveal()
+        val sc = overlaySc
+        when {
+            sc == null -> attachTo(w.second, w.first)
+            // Réouverture du clavier : on rattache toujours la surface à la fenêtre courante.
+            // Le système réutilise le même id d'une ouverture à l'autre, et la surface d'une
+            // fenêtre détruite ne revient jamais d'elle-même — c'est pour ça que la bulle
+            // manquait à la réouverture. Un id inchangé ne prouve donc rien.
+            w.second != attachedId || !kbWasVisible -> reparentTo(a11y, w.second, w.first)
+            w.first != lastKb -> placeAttached(sc, w.first)
         }
+        // Fin de dictée clavier fermé : `stopSession` a masqué la vue, mais la surface reste
+        // accrochée — sans ça, rien ne la remettait visible à la réouverture du clavier.
+        if (root.visibility != View.VISIBLE) reveal()
+        kbWasVisible = true
     }
 
     /** Repli quand la géométrie du clavier est introuvable : coin bas-gauche, au-dessus du clavier. */
@@ -357,7 +367,7 @@ class OverlayService : Service() {
         if (!running) return
         // En mode attaché, `root` n'appartient à aucune fenêtre WindowManager : l'ajouter ici en
         // ferait une fenêtre flottante classique, et la surface ne pourrait plus l'héberger.
-        if (attachMode) {
+        if (canAttach) {
             detachBubble()
             return
         }
@@ -452,7 +462,7 @@ class OverlayService : Service() {
 
         // En mode attaché, la vue n'entre dans aucune fenêtre ici : elle sera hébergée par la
         // surface attachée au clavier, à l'ouverture de celui-ci.
-        if (!attachMode) {
+        if (!canAttach) {
             // `addView` peut échouer (jeton d'accessibilité mort) : sans filet, l'exception
             // remontait à `onCreate` et tuait le processus du service, donc la bulle pour de bon.
             try {
@@ -502,32 +512,37 @@ class OverlayService : Service() {
      * surcouche prend le focus au champ texte et le clavier ne revient plus (`setView(v, w, h)`
      * crée justement une fenêtre focalisable).
      */
+    /** Crée l'hôte de surface une fois : il héberge [root] dans la fenêtre du clavier. */
+    private fun ensureHost() {
+        if (host != null) return
+        val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+        val hostView = SurfaceControlViewHost(this, display, null as IBinder?)
+        hostView.setView(root, SurfaceControlViewHost.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP), false))
+        host = hostView
+    }
+
     private fun attachTo(id: Int, kb: Rect) {
         val a11y = VoxkeyAccessibilityService.instance ?: return
         val now = SystemClock.uptimeMillis()
         // Un attachement qui échoue était retenté à chaque tick (20 fois par seconde), en créant
-        // une surface à chaque fois : elle restait vivante à la sortie de `attachTo` (le `catch`
-        // appelait `detachBubble`, qui ne connaît pas l'hôte local) et la bulle clignotait.
-        if (now - lastAttachFailMs < 500) return
-        detachBubble()
-        // Une View ne peut appartenir qu'à un seul hôte, et `release()` ne la détache pas : la
-        // réutiliser faisait échouer silencieusement le second attachement (bulle perdue à la
-        // réouverture du clavier). On reconstruit donc la hiérarchie à chaque fois.
-        buildViews()
-        var vh: SurfaceControlViewHost? = null
+        // une surface à chaque fois : elle restait vivante à la sortie de `attachTo` et la bulle
+        // clignotait.
+        if (now - lastAttachFailMs < 150) return
         try {
-            val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
-            val hostView = SurfaceControlViewHost(this, display, null as IBinder?)
-            vh = hostView
-            hostView.setView(root, SurfaceControlViewHost.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP), false))
-            val sc = hostView.surfacePackage?.surfaceControl ?: run { hostView.release(); return }
+            // Hôte unique, créé une seule fois : une vue ne peut appartenir qu'à un seul hôte, et
+            // `SurfaceControlViewHost.setView` deux fois sur la même vue échoue en silence.
+            if (host == null) {
+                buildViews()
+                ensureHost()
+            }
+            val sc = host?.surfacePackage?.surfaceControl
+                ?: throw IllegalStateException("surface absente")
             // La surface du ViewHost naît masquée (cf. test CTS) : l'allumer explicitement.
             SurfaceControl.Transaction().setVisibility(sc, true).apply()
             a11y.attachAccessibilityOverlayToWindow(id, sc)
-            placeAttached(sc, kb)
-            host = hostView
             overlaySc = sc
             attachedId = id
+            placeAttached(sc, kb)
             root.visibility = View.VISIBLE
             // Hiérarchie reconstruite : la touche doit reprendre son état d'écoute en cours.
             keyView.active = recording
@@ -535,19 +550,41 @@ class OverlayService : Service() {
         } catch (t: Throwable) {
             Log.e("VXK", "attach failed", t)
             lastAttachFailMs = now
-            vh?.release()
             detachBubble()
         }
     }
 
+    /** Nouvelle fenêtre de clavier (autre application) : la même surface y est replacée. */
+    private fun reparentTo(a11y: VoxkeyAccessibilityService, id: Int, kb: Rect) {
+        val sc = overlaySc ?: run { attachTo(id, kb); return }
+        try {
+            // Une surface rattachée à une fenêtre morte a pu être masquée avec elle : on la
+            // rallume à chaque rattachement, sinon elle reste invisible sur la nouvelle fenêtre.
+            SurfaceControl.Transaction().setVisibility(sc, true).apply()
+            a11y.attachAccessibilityOverlayToWindow(id, sc)
+            attachedId = id
+            placeAttached(sc, kb)
+            Log.d("VXK", "reparent ok id=$id kb=$kb")
+        } catch (t: Throwable) {
+            Log.e("VXK", "reparent failed", t)
+            // L'ancienne fenêtre est morte avec la surface : on repart d'un hôte neuf.
+            detachBubble()
+            lastAttachFailMs = SystemClock.uptimeMillis()
+        }
+    }
+
     private fun detachBubble() {
-        val sc = overlaySc ?: return
+        val sc = overlaySc
         overlaySc = null
         attachedId = 0
-        try {
-            SurfaceControl.Transaction().reparent(sc, null).apply()
-        } catch (t: Throwable) {
-            Log.e("VXK", "detach failed", t)
+        lastKb = null
+        kbWasVisible = false
+        if (sc != null) {
+            try {
+                SurfaceControl.Transaction().reparent(sc, null).apply()
+            } catch (t: Throwable) {
+                Log.e("VXK", "detach failed", t)
+            }
         }
         host?.release()
         host = null
@@ -572,6 +609,7 @@ class OverlayService : Service() {
         posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
         posY = screenBottom - dp(KEY_H_DP) - dp(4) - top
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
+        lastKb = Rect(kb)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
     }
 
