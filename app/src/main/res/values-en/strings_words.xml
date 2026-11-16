@@ -6,7 +6,7 @@
     <string name="keywords_subtitle">An abbreviation you type, a full text written in its place.</string>
     <string name="keywords_add">Add a keyword</string>
     <string name="keywords_empty_title">No keywords</string>
-    <string name="keywords_empty_body">Say “mail thanks” and MyWisper will write your full sign-off.</string>
+    <string name="keywords_empty_body">Say “mail thanks” and MyWhisper will write your full sign-off.</string>
     <string name="keywords_empty_action">Create a keyword</string>
     <string name="keywords_section">My keywords</string>
     <plurals name="keywords_count">

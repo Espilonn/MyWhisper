@@ -1,14 +1,14 @@
-# MyWisper
+# MyWhisper
 
 Dictation that never leaves your phone.
 
-MyWisper is a small personal Android project: a voice-typing key that sits above Gboard's
+MyWhisper is a small personal Android project: a voice-typing key that sits above Gboard's
 space bar, in the spirit of **Nothing's Essential Voice** — tap it, talk, tap again and the
 text is written into whatever field you were in. Recognition runs entirely on the device
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.2**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/EspiIon/MyWisper/releases/latest).
+> Version **1.1.2**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -43,7 +43,7 @@ quantized): no account, no API key, no audio sent anywhere. It works in airplane
 
 ```
 Gboard (system keyboard)
-  └─ MyWisper key, attached to the keyboard window
+  └─ MyWhisper key, attached to the keyboard window
         │  tap
         ▼
 OverlayService (foreground service, microphone type)
@@ -102,9 +102,9 @@ the dictation, the wait after stopping is close to encoding alone.
 
 ## Install
 
-1. Open MyWisper and download a model (415 MB for Q4_K).
+1. Open MyWhisper and download a model (415 MB for Q4_K).
 2. Allow overlay, microphone and notifications.
-3. Enable the MyWisper accessibility service — without it, no text can be typed into other apps.
+3. Enable the MyWhisper accessibility service — without it, no text can be typed into other apps.
 4. Open a text field: the key appears above the keyboard.
 
 Remote install (device on the same tailnet): [docs/remote-install.md](docs/remote-install.md).

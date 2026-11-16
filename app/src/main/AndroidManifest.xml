@@ -11,9 +11,9 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="MyWisper"
+        android:label="MyWhisper"
         android:localeConfig="@xml/locales_config"
-        android:theme="@style/MyWisper">
+        android:theme="@style/MyWhisper">
 
         <activity
             android:name=".MainActivity"

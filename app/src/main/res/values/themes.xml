@@ -7,7 +7,7 @@
       lisibles même quand le téléphone est en thème clair. Sans barre d'action : les écrans
       dessinent leur propre en-tête.
     -->
-    <style name="MyWisper" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+    <style name="MyWhisper" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@color/app_bg</item>
         <item name="android:statusBarColor">@color/app_bg</item>
         <item name="android:navigationBarColor">@color/app_bg</item>

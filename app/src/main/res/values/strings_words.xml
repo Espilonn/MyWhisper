@@ -9,7 +9,7 @@
     <string name="keywords_subtitle">Une abréviation tapée, un texte complet écrit.</string>
     <string name="keywords_add">Ajouter un mot-clé</string>
     <string name="keywords_empty_title">Aucun mot-clé</string>
-    <string name="keywords_empty_body">Dis « mail merci » et MyWisper écrira ta formule de politesse en entier.</string>
+    <string name="keywords_empty_body">Dis « mail merci » et MyWhisper écrira ta formule de politesse en entier.</string>
     <string name="keywords_empty_action">Créer un mot-clé</string>
     <string name="keywords_section">Mes mots-clés</string>
     <plurals name="keywords_count">

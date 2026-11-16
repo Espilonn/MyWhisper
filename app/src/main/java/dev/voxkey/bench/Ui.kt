@@ -26,7 +26,7 @@ const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
 const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
 
 /**
- * Système visuel MyWisper — thème unique sombre (la bulle de dictée est sombre elle aussi).
+ * Système visuel MyWhisper — thème unique sombre (la bulle de dictée est sombre elle aussi).
  *
  * Couleur    fond #0B0C0F · carte #15171D · carte haute #1E2128 · filet #262A33
  *            encre #F4F5F7 · secondaire #8F96A3 · pas d'accent fixe : [Accent] le porte

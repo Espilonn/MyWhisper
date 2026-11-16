@@ -5,8 +5,8 @@
     (strings_<écran>.xml), en français ici et en anglais dans values-en/.
 -->
 <resources>
-    <string name="app_name">MyWisper</string>
-    <string name="a11y_desc">Permet à MyWisper d\u2019écrire le texte dicté dans le champ actif.</string>
+    <string name="app_name">MyWhisper</string>
+    <string name="a11y_desc">Permet à MyWhisper d\u2019écrire le texte dicté dans le champ actif.</string>
     <string name="a11y_dictate">Dicter</string>
     <string name="notif_channel_name">Dictée</string>
     <string name="notif_dictating">Dictée en cours…</string>

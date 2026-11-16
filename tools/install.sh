@@ -58,7 +58,7 @@ if ! wait_bound; then
 fi
 
 if ! bound; then
-  echo "ÉCHEC : accessibilité non liée — à activer dans Réglages > Accessibilité > MyWisper" >&2
+  echo "ÉCHEC : accessibilité non liée — à activer dans Réglages > Accessibilité > MyWhisper" >&2
   exit 1
 fi
 
