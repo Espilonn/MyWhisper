@@ -99,7 +99,9 @@ class VoxkeyAccessibilityService : AccessibilityService() {
         val w = imeWindow() ?: return
         val callback = object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
-                val color = medianColor(result, if (Build.VERSION.SDK_INT >= 34) null else w.first)
+                // Capture d'écran complète puis recadrage sur le clavier : la capture d'une
+                // fenêtre seule (API 34) revenait entièrement noire sur ce téléphone.
+                val color = medianColor(result, w.first)
                 if (color != 0) done(color)
             }
 
@@ -108,9 +110,7 @@ class VoxkeyAccessibilityService : AccessibilityService() {
             }
         }
         runCatching {
-            // API 34 : la fenêtre du clavier seule, donc sans notre bulle ni le reste de l'écran.
-            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(w.second, mainExecutor, callback)
-            else takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, callback)
+            takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, callback)
         }.onFailure { Log.w(TAG, "screenshot refused", it) }
     }
 

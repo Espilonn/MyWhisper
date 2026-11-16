@@ -218,11 +218,8 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         val bubble = ui.card()
         bubble.addView(ui.label(ui.t(R.string.settings_bubble)))
         bubblePreview = BubblePreview(act).apply { refresh(act) }
-        // Hauteur fixe : l'aperçu n'a pas de taille intrinsèque.
-        bubble.addView(
-            bubblePreview,
-            LinearLayout.LayoutParams(MATCH, ui.dp(180)).apply { topMargin = ui.dp(12) },
-        )
+        // Hauteur calculée par l'aperçu lui-même, aux proportions du clavier.
+        bubble.addFull(bubblePreview, 12)
         addSlider(bubble, ui.t(R.string.settings_bubble_horizontal), BubblePreview.DEFAULT_X) { x ->
             Bubble.setPosition(act, x, Bubble.y(act))
             bubblePreview.refresh(act)

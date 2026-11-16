@@ -8,7 +8,7 @@ text is written into whatever field you were in. Recognition runs entirely on th
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.1**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/EspiIon/MyWisper/releases/latest).
+> Version **1.1.2**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/EspiIon/MyWisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -29,6 +29,13 @@ quantized): no account, no API key, no audio sent anywhere. It works in airplane
 - **Dictionary.** Your own names, brands and technical terms, kept on the phone as a list.
   It is not yet fed to the model — it is a reference list, not a correction pass.
 - **Adjustable accent colour.** Yellow by default; the whole app and the bubble follow the choice.
+- **A bubble that blends in.** Or mostly: it reads the keyboard's own background once per opening
+  (one screenshot, cropped to the keyboard, median of a pixel grid, kept in memory and never
+  written to disk) and picks the ink that stays legible on it. Dark and accent colours remain
+  available if you prefer a key that stands out.
+- **Adjustable position.** Two sliders in the settings, over a preview of Gboard, move the bubble
+  across the keyboard; the preview draws it where it will really land. The default is the old
+  spot, and the position follows rotation, foldables and a resized keyboard.
 - **Bilingual UI.** French and English; the app follows the system language (French is the
   default when the locale is neither).
 
@@ -109,6 +116,8 @@ Remote install (device on the same tailnet): [docs/remote-install.md](docs/remot
   does not exist yet.
 - **Android 12+** required (`minSdk 31`).
 - The key is anchored to Gboard's window; other keyboards have not been validated.
+- Reading the keyboard colour needs the screenshot capability of the accessibility service:
+  after an update of the app, toggle the service off and on once if the bubble stays dark.
 - Each dictation pays the model load first (0.5–1.1 s, hidden by recording), then about
   0.15 × the audio duration.
 - No licence yet: the code is public but all rights reserved. The `third_party/whisper.cpp`

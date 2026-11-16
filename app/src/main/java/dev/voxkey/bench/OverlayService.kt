@@ -325,7 +325,10 @@ class OverlayService : Service() {
         // Un seul pixel de clavier visible suffit : accrochée dès le début de la montée, la
         // surface suit ensuite l'animation d'elle-même. Attendre que le clavier soit levé de
         // 150 px ajoutait exactement le délai qu'on voyait à l'ouverture.
-        val visible = w != null && w.first.top < wm.currentWindowMetrics.bounds.height()
+        // Sauf qu'une fenêtre basse (barre repliée, 37 px mesurés) n'est pas un clavier : la
+        // placer et l'échantillonner dessus donnait une bulle noire collée en bas.
+        val visible = w != null && w.first.top < wm.currentWindowMetrics.bounds.height() &&
+            w.first.height() > dp(120)
         if (!visible) {
             // Clavier fermé : c'est ici que se jouait le bug de la bulle qui ne revenait jamais.
             // `imeWindow()` manque parfois une frame pendant l'animation, donc on note la fermeture
@@ -529,8 +532,17 @@ class OverlayService : Service() {
         val now = SystemClock.uptimeMillis()
         if (now - lastSampleMs < SAMPLE_MS) return
         val a11y = VoxkeyAccessibilityService.instance ?: return
+        // Le clavier doit être levé : capturé pendant la montée, il n'est pas encore dessiné et
+        // la médiane sort en noir pur.
+        val w = a11y.imeWindow() ?: return
+        val kb = w.first
+        val screenH = wm.currentWindowMetrics.bounds.height()
+        if (kb.height() <= dp(120)) return
+        if (kb.top > screenH - dp(200)) return
+        if (kb.bottom > screenH + dp(24)) return
         lastSampleMs = now
         a11y.sampleKeyboardColor { color ->
+            Log.d("VXK", "sample=#${Integer.toHexString(color)}")
             if (color == 0 || color == Bubble.sampled(this)) return@sampleKeyboardColor
             Bubble.setSampled(this, color)
             applyBubbleColor()
@@ -662,10 +674,15 @@ class OverlayService : Service() {
         if (Bubble.custom(this)) {
             // Fractions du clavier : la bulle suit la rotation, un écran plié et la hauteur
             // variable du clavier, sans réglage par appareil.
+            // Au moment du rattachement, le clavier n'a pas fini de monter : sa fenêtre est encore
+            // collée en bas (mesurée à 38 px de haut, débordant sous l'écran) alors que sa hauteur
+            // définitive, elle, est déjà bonne. On ancre donc sur le bas de l'écran, où le clavier
+            // finit toujours, et sur la hauteur de la fenêtre.
             val w = dp(KEY_W_DP)
             val h = dp(KEY_H_DP)
+            val kh = kb.height()
             posX = (kb.left + Bubble.x(this) * (kb.width() - w)).toInt()
-            posY = (kb.bottom - top - dp(4) - h - (1f - Bubble.y(this)) * (kb.height() - h - dp(4))).toInt()
+            posY = (screenBottom - top - dp(4) - h - (1f - Bubble.y(this)) * (kh - h - dp(4))).toInt()
         } else {
             // Position d'origine, gardée telle quelle tant que l'utilisateur n'a rien réglé.
             posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
@@ -673,9 +690,10 @@ class OverlayService : Service() {
         }
         SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
         applyBubbleColor()
-        // Capture après la fin de l'animation : pendant la montée, la fenêtre du clavier laisse
-        // voir l'application derrière et la médiane prendrait sa couleur.
-        main.postDelayed({ sampleBubbleColor() }, 350)
+        // Capture après la fin de l'animation, avec une seconde chance : pendant la montée, la
+        // fenêtre du clavier laisse voir l'application derrière et la médiane prendrait sa couleur.
+        main.postDelayed({ sampleBubbleColor() }, 500)
+        main.postDelayed({ sampleBubbleColor() }, 1300)
         Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
     }
 

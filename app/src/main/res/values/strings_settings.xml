@@ -47,7 +47,7 @@
     <string name="settings_bubble_vertical">Vertical</string>
     <string name="settings_bubble_percent">%1$d %%</string>
     <string name="settings_bubble_reset">Réinitialiser la position</string>
-    <string name="settings_bubble_hint">0 % à gauche ou en haut, 100 % à droite ou en bas. La position suit la rotation et la hauteur du clavier.</string>
+    <string name="settings_bubble_hint">0 %% à gauche ou en haut, 100 %% à droite ou en bas. La position suit la rotation et la hauteur du clavier.</string>
     <string name="settings_bubble_color_hint">Automatique lit la couleur des touches à chaque ouverture du clavier ; la capture reste en mémoire.</string>
     <string name="settings_bubble_auto">Automatique</string>
     <string name="settings_bubble_dark">Sombre</string>
