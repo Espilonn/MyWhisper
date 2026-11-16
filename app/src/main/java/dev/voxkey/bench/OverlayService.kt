@@ -317,7 +317,10 @@ class OverlayService : Service() {
         // fenêtre morte avec le même id).
         val a11y = VoxkeyAccessibilityService.instance ?: return
         val w = a11y.imeWindow() ?: return
-        val visible = w.first.top < wm.currentWindowMetrics.bounds.height() - 150
+        // Un seul pixel de clavier visible suffit : accrochée dès le début de la montée, la
+        // surface suit ensuite l'animation d'elle-même. Attendre que le clavier soit levé de
+        // 150 px ajoutait exactement le délai qu'on voyait à l'ouverture.
+        val visible = w.first.top < wm.currentWindowMetrics.bounds.height()
         if (!visible) {
             kbWasVisible = false
             return
