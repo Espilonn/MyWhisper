@@ -5,6 +5,13 @@
     <string name="home_tagline">Ta dictée, sur le téléphone</string>
     <string name="home_status_ready">●\u0020\u0020Prêt</string>
     <string name="home_configure">Configurer</string>
+    <string name="home_status_update">↑\u0020\u0020Mise à jour</string>
+    <string name="update_title">MyWhisper %1$s</string>
+    <string name="update_install">Installer</string>
+    <string name="update_no_notes">Aucune note pour cette version.</string>
+    <string name="update_progress">↓\u0020\u0020%1$d %%</string>
+    <string name="update_unknown_sources">Autorise MyWhisper à installer des applis : Réglages → Applis → Accès spéciaux → Installer des applis inconnues.</string>
+    <string name="update_failed">Mise à jour impossible : %1$s</string>
     <string name="home_words_label">Mots dictés</string>
     <string name="home_span_week">Semaine</string>
     <string name="home_span_month">Mois</string>

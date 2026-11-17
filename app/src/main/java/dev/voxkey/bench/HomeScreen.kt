@@ -5,6 +5,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.Toast
 import java.time.LocalDate
 import kotlin.math.abs
 
@@ -31,6 +32,10 @@ class HomeScreen(
     /** Fenêtre du graphique : 0 = semaine, 1 = mois, 2 = six mois. */
     private var span = 1
 
+    /** Release GitHub plus récente, si la vérification en a trouvé une. */
+    private var release: Update.Release? = null
+    private var checked = false
+
     private val dayCount get() = when (span) {
         0 -> 7
         1 -> 30
@@ -38,20 +43,53 @@ class HomeScreen(
     }
 
     init {
-        status.setOnClickListener { onOpenSettings() }
+        status.setOnClickListener { release?.let { showUpdate(it) } ?: onOpenSettings() }
+        checkUpdate()
         refresh()
     }
 
     /** Relit les droits puis les chiffres (appelé à chaque retour sur l'onglet). */
     fun refresh() {
+        checkUpdate()
         paintStatus()
         render()
+    }
+
+    /** Une seule vérification par lancement : le cache de 24 h évite d'interroger GitHub. */
+    private fun checkUpdate() {
+        if (checked) return
+        checked = true
+        Update.check(act) { r ->
+            release = r
+            paintStatus()
+        }
+    }
+
+    private fun showUpdate(r: Update.Release) {
+        val notes = r.notes.ifBlank { ui.t(R.string.update_no_notes) }
+        ui.notes(ui.t(R.string.update_title, r.version), notes, ui.t(R.string.update_install)) {
+            Update.install(
+                act,
+                r,
+                onProgress = { pct -> status.text = ui.t(R.string.update_progress, pct) },
+                onError = { msg ->
+                    status.text = ui.t(R.string.home_status_update)
+                    Toast.makeText(act, msg, Toast.LENGTH_LONG).show()
+                },
+            )
+        }
     }
 
     private fun ready() =
         Settings.canDrawOverlays(act) && SettingsScreen.isAccessibilityOn(act) && SettingsScreen.micGranted(act)
 
     private fun paintStatus() {
+        if (release != null) {
+            status.text = ui.t(R.string.home_status_update)
+            status.setTextColor(Ui.ON_ACCENT)
+            status.background = ui.rounded(Ui.ACCENT, 99)
+            return
+        }
         val on = ready()
         status.text = if (on) ui.t(R.string.home_status_ready) else ui.t(R.string.home_configure)
         status.setTextColor(if (on) Ui.GOOD else Ui.ON_ACCENT)

@@ -561,6 +561,24 @@ class UiKit(private val ctx: Context) {
         show(d, card)
     }
 
+    /** Texte long (notes de version) : zone qui défile, hauteur fixée, un bouton d'action. */
+    fun notes(title: String, message: String, confirmLabel: String, onConfirm: () -> Unit) {
+        val d = dialog()
+        val card = dialogCard()
+        card.addView(heading(title).apply { textSize = 20f })
+        card.addView(
+            ScrollView(ctx).apply {
+                addView(body(message).apply { setPadding(0, dp(8), 0, dp(4)) })
+            },
+            LinearLayout.LayoutParams(MATCH, dp(240)).apply { topMargin = dp(12) },
+        )
+        card.addView(
+            actions(d, confirmLabel, Ui.ON_ACCENT, Ui.ACCENT) { onConfirm(); true },
+            LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(18) },
+        )
+        show(d, card)
+    }
+
     /** Choix unique : une option par bouton, la courante en accent. */
     fun choose(title: String, options: List<String>, selected: Int, onPick: (Int) -> Unit) {
         val d = dialog()

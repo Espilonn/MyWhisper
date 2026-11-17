@@ -8,7 +8,7 @@ text is written into whatever field you were in. Recognition runs entirely on th
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.3**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
+> Version **1.1.4**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -109,6 +109,16 @@ the dictation, the wait after stopping is close to encoding alone.
 
 Remote install (device on the same tailnet): [docs/remote-install.md](docs/remote-install.md).
 
+### Updates
+
+From 1.1.4 on, the app asks GitHub for the latest release at launch, at most once a day. When one is newer, the status pill on the home screen turns into **↑ Update**: tap it to read the release notes and install. The APK is downloaded by the app itself and handed to the system installer — no browser, no manual download.
+
+Two Android switches matter:
+- **Install unknown apps** — tapping *Install* opens the right screen; allow MyWhisper there.
+- **Play Protect** can still show "This app can request access to sensitive data" on the update, exactly like the first install. Same workaround, below.
+
+Self-update is turned off when MyWhisper was installed from Google Play (`com.android.vending`), as Play policy requires.
+
 ### Play Protect blocks the install
 
 An APK that declares an accessibility service trips Google Play Protect: the phone
@@ -120,7 +130,7 @@ Two ways through:
 
 - **adb** — enable *Developer options → USB debugging*, plug the phone in, then:
   ```
-  adb install -r MyWhisper-1.1.3-arm64.apk
+  adb install -r MyWhisper-1.1.4-arm64.apk
   ```
   If it answers `INSTALL_FAILED_VERIFICATION_FAILURE`, turn off
   *Developer options → Verify apps over USB* and retry.
