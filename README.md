@@ -2,13 +2,20 @@
 
 Dictation that never leaves your phone.
 
+<picture>
+  <source media="(max-aspect-ratio: 1/1)" srcset="docs/img/hero-4x3.jpg">
+  <img src="docs/img/hero.jpg" alt="MyWhisper: the dictation key in the corner of the keyboard, 100% on-device, works in airplane mode, no account">
+</picture>
+
+![MyWhisper — a blue dictation key attached under the last keyboard row](docs/img/hero.jpg)
+
 MyWhisper is a small personal Android project: a voice-typing key that sits above Gboard's
 space bar, in the spirit of **Nothing's Essential Voice** — tap it, talk, tap again and the
 text is written into whatever field you were in. Recognition runs entirely on the device
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.4**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
+> Version **1.1.12**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -102,10 +109,27 @@ the dictation, the wait after stopping is close to encoding alone.
 
 ## Install
 
-1. Open MyWhisper and download a model (415 MB for Q4_K).
-2. Allow overlay, microphone and notifications.
-3. Enable the MyWhisper accessibility service — without it, no text can be typed into other apps.
-4. Open a text field: the key appears above the keyboard.
+MyWhisper does not come from Google Play, so Android puts up several blocks before dictation works.
+All of them are one-time. The in-app **Get started** card tracks the last three and opens each
+screen for you.
+
+1. **Let the phone install the APK.** Tap the downloaded file; if Android refuses, allow *Install
+   unknown apps* for whatever opened it (Files, Chrome…). The in-app updater needs that same switch
+   later.
+2. **Get past Play Protect if it blocks.** An APK that declares an accessibility service is
+   sometimes stopped with *App blocked to protect your device → This app can request access to
+   sensitive data*, and no install button is offered. Turning off *Play Store → profile → Play
+   Protect → ⚙ → Scan apps with Play Protect* may lift it, but often does not: the rule is keyed on
+   the permission itself. If it stays blocked, use one of the two routes in
+   [Play Protect blocks the install](#play-protect-blocks-the-install).
+3. **Open MyWhisper and download a model.** 415 MB for Q4_K, 668 MB for Q8_0. Prefer Wi-Fi — see
+   [The model download stalls](#the-model-download-stalls) if the progress line freezes.
+4. **Allow notifications, microphone and overlay.** Notifications and microphone are ordinary
+   runtime prompts; *Draw over other apps* is a separate screen, which the card opens.
+5. **Enable the accessibility service.** *Settings → Accessibility → MyWhisper → On*. If the toggle
+   is greyed out, allow restricted settings first: *Settings → Apps → MyWhisper → ⋮ → Allow
+   restricted settings*. No text is typed into other apps without this step.
+6. **Turn the dictation key on**, then open any text field: the key appears above the keyboard.
 
 Remote install (device on the same tailnet): [docs/remote-install.md](docs/remote-install.md).
 
@@ -130,7 +154,7 @@ Two ways through:
 
 - **adb** — enable *Developer options → USB debugging*, plug the phone in, then:
   ```
-  adb install -r MyWhisper-1.1.4-arm64.apk
+  adb install -r MyWhisper-1.1.12-arm64.apk
   ```
   If it answers `INSTALL_FAILED_VERIFICATION_FAILURE`, turn off
   *Developer options → Verify apps over USB* and retry.
