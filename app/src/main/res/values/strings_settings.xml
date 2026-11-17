@@ -21,6 +21,8 @@
     <string name="settings_step_a11y_hint">Écrit le texte dicté dans le champ actif.</string>
     <string name="settings_step_a11y_done">Activée</string>
     <string name="settings_step_a11y_action">Ouvrir les réglages d\'accessibilité</string>
+    <string name="settings_restricted_hint">Bascule grisée ? Dans la fiche de l\'app, menu ⋮ en haut à droite → « Autoriser les paramètres restreints ».</string>
+    <string name="settings_restricted_action">Ouvrir la fiche de l\'app</string>
 
     <string name="settings_step_mic">Micro</string>
     <string name="settings_step_mic_hint">Enregistre ta voix pendant la dictée.</string>
@@ -66,6 +68,10 @@
     <string name="settings_refresh">Rafraîchir</string>
     <string name="settings_model_empty">Aucun modèle trouvé. Ajoute un fichier de modèle (.bin ou .gguf) à l\'app, puis appuie sur Rafraîchir.</string>
     <string name="settings_model_file">%1$s (%2$s)</string>
+    <string name="settings_model_delete">Supprimer le modèle</string>
+    <string name="settings_model_delete_confirm">Supprimer %1$s du téléphone ? Il faudra le retélécharger pour dicter.</string>
+    <string name="settings_model_delete_failed">Suppression impossible</string>
+    <string name="settings_model_deleted">Modèle supprimé</string>
     <string name="settings_model_line">%1$s · %2$s</string>
     <string name="settings_download_title">Télécharger un modèle</string>
     <string name="settings_download_action">Télécharger</string>

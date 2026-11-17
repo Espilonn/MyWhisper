@@ -3,6 +3,7 @@ package dev.voxkey.bench
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.LocaleManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -22,6 +23,7 @@ import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import java.io.File
 
 /**
  * Réglages : mise en place (droits), modèle, dictée. La logique vient de l'ancien écran d'accueil
@@ -126,7 +128,12 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private lateinit var modelEmpty: TextView
     private lateinit var downloadBox: LinearLayout
     private lateinit var downloadStatus: TextView
+    private lateinit var deleteModel: Button
+    private var modelFiles: List<File> = emptyList()
     private lateinit var setupProgress: TextView
+    /** Aide affichée tant que l'accessibilité est bloquée par les paramètres restreints. */
+    private lateinit var restrictedHint: TextView
+    private lateinit var restrictedButton: Button
     private lateinit var bubblePreview: BubblePreview
     private lateinit var bubbleH: SeekBar
     private lateinit var bubbleV: SeekBar
@@ -192,6 +199,20 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             if (i > 0) setup.addRule()
             setup.addFull(stepRow(s), if (i == 0) 6 else 0)
         }
+        // Une app installée hors store a ses bascules d'accessibilité grisées jusqu'à ce que
+        // l'utilisateur autorise les paramètres restreints depuis la fiche de l'app.
+        restrictedHint = ui.meta(ui.t(R.string.settings_restricted_hint)).apply {
+            setPadding(0, ui.dp(12), 0, 0)
+            visibility = View.GONE
+        }
+        setup.addView(restrictedHint)
+        restrictedButton = ui.button(ui.t(R.string.settings_restricted_action), primary = false) {
+            // Android n'expose pas d'écran dédié : la fiche de l'app porte le menu ⋮.
+            act.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${act.packageName}")),
+            )
+        }.apply { visibility = View.GONE }
+        setup.addFull(restrictedButton, 10)
         content.addView(setup, LinearLayout.LayoutParams(MATCH, WRAP))
 
         // Apparence : un accent unique, choisi parmi cinq, qui recolore toute l'app.
@@ -291,6 +312,8 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             setOnClickListener { modelSpinner.performClick() }
         }
         model.addFull(modelField, 10)
+        deleteModel = ui.button(ui.t(R.string.settings_model_delete), primary = false) { confirmDeleteModel() }
+        model.addFull(deleteModel, 8)
         modelEmpty = ui.meta(
             ui.t(R.string.settings_model_empty),
         )
@@ -523,6 +546,10 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             s.button.visibility =
                 if (isCurrent || s.alwaysShowButton) View.VISIBLE else View.GONE
         }
+        // L'aide ne sert que tant que l'accessibilité manque.
+        val restricted = !isAccessibilityOn(act)
+        restrictedHint.visibility = if (restricted) View.VISIBLE else View.GONE
+        restrictedButton.visibility = if (restricted) View.VISIBLE else View.GONE
     }
 
     private fun refreshModels() {
@@ -530,6 +557,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             ?.filter { it.name.endsWith(".bin") || it.name.endsWith(".gguf") }
             ?.sortedBy { it.length() }
             ?: emptyList()
+        modelFiles = files
 
         modelSpinner.adapter = object : ArrayAdapter<String>(act, 0, files.map {
             ui.t(R.string.settings_model_file, it.name, ui.t(R.string.megabytes, it.length() / 1_048_576))
@@ -555,6 +583,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         modelSpinner.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
         modelField.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
         modelEmpty.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
+        deleteModel.visibility = if (files.isEmpty() || downloading) View.GONE else View.VISIBLE
 
         val prefs = act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
         val saved = prefs.getString("model", null)
@@ -598,6 +627,31 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
             b.alpha = if (downloading) 0.4f else 1f
             downloadBox.addFull(b, 8)
         }
+    }
+
+    private fun confirmDeleteModel() {
+        val f = modelFiles.getOrNull(modelSpinner.selectedItemPosition) ?: return
+        AlertDialog.Builder(act)
+            .setMessage(ui.t(R.string.settings_model_delete_confirm, f.name))
+            .setNegativeButton(ui.t(R.string.cancel), null)
+            .setPositiveButton(ui.t(R.string.settings_model_delete)) { _, _ -> removeModel(f) }
+            .show()
+    }
+
+    private fun removeModel(f: File) {
+        if (!f.delete()) {
+            Toast.makeText(act, ui.t(R.string.settings_model_delete_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+        // Le modèle supprimé peut être celui que la dictée charge au démarrage.
+        val prefs = act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE)
+        if (prefs.getString("model", null) == f.name) {
+            val next = modelFiles.firstOrNull { it != f }
+            if (next != null) prefs.edit().putString("model", next.name).apply()
+            else prefs.edit().remove("model").apply()
+        }
+        Toast.makeText(act, ui.t(R.string.settings_model_deleted), Toast.LENGTH_SHORT).show()
+        refreshModels()
     }
 
     private fun startDownload(m: ModelCatalog.Remote) {

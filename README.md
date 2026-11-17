@@ -8,7 +8,7 @@ text is written into whatever field you were in. Recognition runs entirely on th
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.2**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
+> Version **1.1.3**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -108,6 +108,48 @@ the dictation, the wait after stopping is close to encoding alone.
 4. Open a text field: the key appears above the keyboard.
 
 Remote install (device on the same tailnet): [docs/remote-install.md](docs/remote-install.md).
+
+### Play Protect blocks the install
+
+An APK that declares an accessibility service trips Google Play Protect: the phone
+shows *App blocked to protect your device — This app can request access to sensitive
+data* and offers **no install button**. The block is automatic and is keyed on the
+`BIND_ACCESSIBILITY_SERVICE` permission itself, not on what the code does.
+
+Two ways through:
+
+- **adb** — enable *Developer options → USB debugging*, plug the phone in, then:
+  ```
+  adb install -r MyWhisper-1.1.3-arm64.apk
+  ```
+  If it answers `INSTALL_FAILED_VERIFICATION_FAILURE`, turn off
+  *Developer options → Verify apps over USB* and retry.
+- **Play internal testing** — upload the same APK to an internal test track. Play
+  becomes the installer, so the block never appears; it is the only route that works
+  for other people without a cable. A Play developer account is required, and Play
+  now asks for `targetSdk` 36 (this app targets 35).
+
+Turning off *Play Protect → Scan apps with Play Protect* does not lift the block in
+most cases — that setting controls the scanner, not the sensitive-permission rule.
+
+### The accessibility toggle is greyed out
+
+Android 13+ refuses accessibility to sideloaded apps ("restricted settings"). In
+*Settings → Apps → MyWhisper*, open the **⋮** menu at the top right and pick
+*Allow restricted settings*, then enable the service. The app's setup card shows a
+button that opens that page.
+
+### Replacing a debug build
+
+Debug and release APKs are signed with different keys, so neither can overwrite the
+other (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Uninstall first — `adb uninstall
+dev.voxkey.bench` — which also deletes the downloaded model.
+
+### The model download stalls
+
+Some Wi-Fi networks (filtering router, ad-hoc DNS, transparent proxy) stall the
+Hugging Face CDN while mobile data goes through at full speed. If the progress line
+does not move, try another network; a partial download is discarded, never used.
 
 ## Limitations
 

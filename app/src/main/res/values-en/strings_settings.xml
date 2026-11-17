@@ -18,6 +18,8 @@
     <string name="settings_step_a11y_hint">Types dictated text into the active field.</string>
     <string name="settings_step_a11y_done">Enabled</string>
     <string name="settings_step_a11y_action">Open accessibility settings</string>
+    <string name="settings_restricted_hint">Toggle greyed out? In the app info page, ⋮ menu at the top right → “Allow restricted settings”.</string>
+    <string name="settings_restricted_action">Open the app info page</string>
 
     <string name="settings_step_mic">Microphone</string>
     <string name="settings_step_mic_hint">Records your voice during dictation.</string>
@@ -63,6 +65,10 @@
     <string name="settings_refresh">Refresh</string>
     <string name="settings_model_empty">No model found. Add a model file (.bin or .gguf) to the app, then tap Refresh.</string>
     <string name="settings_model_file">%1$s (%2$s)</string>
+    <string name="settings_model_delete">Delete model</string>
+    <string name="settings_model_delete_confirm">Delete %1$s from the phone? You will have to download it again to dictate.</string>
+    <string name="settings_model_delete_failed">Cannot delete</string>
+    <string name="settings_model_deleted">Model deleted</string>
     <string name="settings_model_line">%1$s · %2$s</string>
     <string name="settings_download_title">Download a model</string>
     <string name="settings_download_action">Download</string>
