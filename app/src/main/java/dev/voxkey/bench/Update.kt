@@ -22,7 +22,7 @@ import org.json.JSONObject
  */
 object Update {
 
-    class Release(val version: String, val notes: String, val url: String)
+    class Release(val version: String, val notes: String, val url: String, val newer: Boolean = false)
 
     private const val API = "https://api.github.com/repos/Espilonn/MyWhisper/releases/latest"
     private const val DAY = 24 * 60 * 60 * 1000L
@@ -37,16 +37,19 @@ object Update {
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }
             .getOrNull().orEmpty()
 
-    /** Version publiée plus récente que celle-ci, ou null. Le résultat est gardé 24 h. */
-    fun check(ctx: Context, onResult: (Release?) -> Unit) {
+    /** Dernière release publiée, avec son indicateur « plus récente que l'app ». */
+    fun check(ctx: Context, force: Boolean = false, onResult: (Release?) -> Unit) {
         if (installedByPlay(ctx)) {
             onResult(null)
             return
         }
         val p = prefs(ctx)
         val now = System.currentTimeMillis()
-        if (now - p.getLong("updateAt", 0L) < DAY) {
-            onResult(cached(ctx))
+        val cached = cached(ctx)
+        // Seule une release trouvée est gardée 24 h : une réponse « rien de neuf » ne l'est pas,
+        // sinon une version publiée juste après le lancement reste invisible jusqu'au lendemain.
+        if (!force && cached != null && now - p.getLong("updateAt", 0L) < DAY) {
+            onResult(cached)
             return
         }
         thread(name = "voxkey-update") {
@@ -56,13 +59,14 @@ object Update {
             } catch (t: Throwable) {
                 // Pas de réseau : on ne date pas la vérification, elle repartira au prochain lancement.
                 Log.w("VXK", "update check", t)
-                null
+                cached
             }
             if (ok) {
                 p.edit().putLong("updateAt", now)
                     .putString("updateVersion", r?.version)
                     .putString("updateNotes", r?.notes)
                     .putString("updateUrl", r?.url)
+                    .putBoolean("updateNewer", r?.newer == true)
                     .apply()
             }
             main.post { onResult(r) }
@@ -73,10 +77,10 @@ object Update {
         val p = prefs(ctx)
         val v = p.getString("updateVersion", null) ?: return null
         val url = p.getString("updateUrl", null) ?: return null
-        return Release(v, p.getString("updateNotes", "").orEmpty(), url)
+        return Release(v, p.getString("updateNotes", "").orEmpty(), url, p.getBoolean("updateNewer", false))
     }
 
-    /** Lance la vérification ; null quand l'app est déjà à jour. Lève sur erreur réseau. */
+    /** Dernière release publiée ; `newer` dit si elle est plus récente que l'app. */
     private fun fetch(ctx: Context): Release? {
         val conn = (URL(API).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
@@ -88,12 +92,16 @@ object Update {
             if (conn.responseCode !in 200..299) return null
             val json = JSONObject(conn.inputStream.bufferedReader().readText())
             val tag = json.optString("tag_name").trimStart('v', 'V')
-            if (compare(tag, currentVersion(ctx)) <= 0) return null
             val assets = json.optJSONArray("assets") ?: return null
             for (i in 0 until assets.length()) {
                 val a = assets.getJSONObject(i)
                 if (a.optString("name").endsWith("-arm64.apk")) {
-                    return Release(tag, json.optString("body"), a.optString("browser_download_url"))
+                    return Release(
+                        tag,
+                        json.optString("body"),
+                        a.optString("browser_download_url"),
+                        compare(tag, currentVersion(ctx)) > 0,
+                    )
                 }
             }
             return null

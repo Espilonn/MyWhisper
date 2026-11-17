@@ -8,6 +8,11 @@
     <string name="home_status_update">↑\u0020\u0020Update</string>
     <string name="update_title">MyWhisper %1$s</string>
     <string name="update_install">Install</string>
+    <string name="update_check">Check for an update</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You are up to date · MyWhisper %1$s</string>
+    <string name="update_latest">Latest published release: %1$s</string>
+    <string name="update_check_failed">Check failed: GitHub did not answer.</string>
     <string name="update_no_notes">No notes for this version.</string>
     <string name="update_progress">↓\u0020\u0020%1$d %%</string>
     <string name="update_unknown_sources">Allow MyWhisper to install apps: Settings → Apps → Special app access → Install unknown apps.</string>

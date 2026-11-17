@@ -43,7 +43,14 @@ class HomeScreen(
     }
 
     init {
-        status.setOnClickListener { release?.let { showUpdate(it) } ?: onOpenSettings() }
+        status.setOnClickListener {
+            val r = release
+            when {
+                r != null && r.newer -> showUpdate(r)
+                ready() -> showVersion()
+                else -> onOpenSettings()
+            }
+        }
         checkUpdate()
         refresh()
     }
@@ -80,11 +87,41 @@ class HomeScreen(
         }
     }
 
+    /** Fiche « à jour » : version installée, notes de la dernière release, et de quoi re-chercher. */
+    private fun showVersion() {
+        val current = Update.currentVersion(act)
+        val r = release
+        val text = buildString {
+            append(ui.t(R.string.update_up_to_date, current))
+            if (r != null) {
+                append("\n\n")
+                append(ui.t(R.string.update_latest, r.version))
+                append("\n\n")
+                append(r.notes.ifBlank { ui.t(R.string.update_no_notes) })
+            }
+        }
+        ui.notes(ui.t(R.string.update_title, current), text, ui.t(R.string.update_check)) { checkNow() }
+    }
+
+    /** Recherche à la demande : `force` ignore le cache de 24 h. */
+    private fun checkNow() {
+        status.text = ui.t(R.string.update_checking)
+        Update.check(act, force = true) { r ->
+            release = r
+            paintStatus()
+            when {
+                r == null -> Toast.makeText(act, ui.t(R.string.update_check_failed), Toast.LENGTH_LONG).show()
+                r.newer -> showUpdate(r)
+                else -> Toast.makeText(act, ui.t(R.string.update_up_to_date, Update.currentVersion(act)), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun ready() =
         Settings.canDrawOverlays(act) && SettingsScreen.isAccessibilityOn(act) && SettingsScreen.micGranted(act)
 
     private fun paintStatus() {
-        if (release != null) {
+        if (release?.newer == true) {
             status.text = ui.t(R.string.home_status_update)
             status.setTextColor(Ui.ON_ACCENT)
             status.background = ui.rounded(Ui.ACCENT, 99)
