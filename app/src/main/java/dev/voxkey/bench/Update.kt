@@ -66,18 +66,23 @@ object Update {
                     .putString("updateVersion", r?.version)
                     .putString("updateNotes", r?.notes)
                     .putString("updateUrl", r?.url)
-                    .putBoolean("updateNewer", r?.newer == true)
                     .apply()
             }
             main.post { onResult(r) }
         }
     }
 
+    /** Le cache garde la version publiée, pas le verdict : il est recalculé contre la version installée. */
     private fun cached(ctx: Context): Release? {
         val p = prefs(ctx)
         val v = p.getString("updateVersion", null) ?: return null
         val url = p.getString("updateUrl", null) ?: return null
-        return Release(v, p.getString("updateNotes", "").orEmpty(), url, p.getBoolean("updateNewer", false))
+        return Release(
+            v,
+            p.getString("updateNotes", "").orEmpty(),
+            url,
+            compare(v, currentVersion(ctx)) > 0,
+        )
     }
 
     /** Dernière release publiée ; `newer` dit si elle est plus récente que l'app. */

@@ -66,9 +66,12 @@ class HomeScreen(
     private fun checkUpdate() {
         if (checked) return
         checked = true
+        val v = Update.currentVersion(act)
         Update.check(act) { r ->
             release = r
-            paintStatus()
+            // Une installation a pu changer la version pendant la vérification : on repart de ce verdict.
+            if (Update.currentVersion(act) != v) checkNow()
+            else paintStatus()
         }
     }
 
