@@ -1,13 +1,8 @@
 # MyWhisper
 
-Dictation that never leaves your phone.
+![MyWhisper](docs/img/banner.jpg)
 
-<picture>
-  <source media="(max-aspect-ratio: 1/1)" srcset="docs/img/hero-4x3.jpg">
-  <img src="docs/img/hero.jpg" alt="MyWhisper: the dictation key in the corner of the keyboard, 100% on-device, works in airplane mode, no account">
-</picture>
-
-![MyWhisper — a blue dictation key attached under the last keyboard row](docs/img/hero.jpg)
+![The dictation key sitting at the left end of the keyboard](docs/img/keyboard.jpg)
 
 MyWhisper is a small personal Android project: a voice-typing key that sits above Gboard's
 space bar, in the spirit of **Nothing's Essential Voice** — tap it, talk, tap again and the
