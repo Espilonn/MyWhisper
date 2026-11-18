@@ -10,7 +10,7 @@ text is written into whatever field you were in. Recognition runs entirely on th
 with an AI model ([NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/ggml-org/parakeet-GGUF),
 quantized): no account, no API key, no audio sent anywhere. It works in airplane mode.
 
-> Version **1.1.16**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
+> Version **1.1.17**. Signed APK (~6 MB, arm64, Android 12+): [Releases](https://github.com/Espilonn/MyWhisper/releases/latest).
 > The internal identifiers (`dev.voxkey.bench`, `voxkey.db`, `voxkey` preferences) are leftovers
 > from the working name "voxkey" and have not been migrated — renaming them would create a second
 > app and force a model re-download.
@@ -149,7 +149,7 @@ Two ways through:
 
 - **adb** — enable *Developer options → USB debugging*, plug the phone in, then:
   ```
-  adb install -r MyWhisper-1.1.16-arm64.apk
+  adb install -r MyWhisper-1.1.17-arm64.apk
   ```
   If it answers `INSTALL_FAILED_VERIFICATION_FAILURE`, turn off
   *Developer options → Verify apps over USB* and retry.
