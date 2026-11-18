@@ -7,32 +7,21 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
-import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
 import android.provider.Settings
-import android.view.Display
-import android.view.Gravity
+import android.util.Log
 import android.view.SurfaceControl
 import android.view.SurfaceControlViewHost
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import java.io.File
-import java.util.Locale
 import kotlin.concurrent.thread
 
 /**
@@ -41,6 +30,9 @@ import kotlin.concurrent.thread
  * Service démarré normalement (pas de notification au repos). Il passe en
  * foreground seulement pendant l'enregistrement, car Android exige un service
  * foreground pour accéder au micro en arrière-plan.
+ *
+ * La géométrie du clavier vit dans `BubblePlacement.kt`, la construction des vues dans
+ * `BubbleView.kt` et le post-traitement du texte dans `PostProcess.kt`.
  */
 class OverlayService : Service() {
 
@@ -50,13 +42,13 @@ class OverlayService : Service() {
         private const val CHANNEL_ID = "voxkey-dictation"
         private const val NOTIF_ID = 42
         /** Intervalle de lecture du clavier (filet de sécurité ; les événements d'accessibilité passent avant). */
-        private const val POLL_MS = 50L
+        internal const val POLL_MS = 50L
         /** Une zone clavier n'est suivie qu'une fois identique pendant ce délai : pas les frames d'animation. */
-        private const val SETTLE_MS = 16L
+        internal const val SETTLE_MS = 16L
         /** Délai avant de masquer la touche quand le clavier n'est plus lu du tout. */
-        private const val HIDE_GRACE_MS = 400L
+        internal const val HIDE_GRACE_MS = 400L
         /** Une capture de clavier par ouverture suffit : le système limite leur fréquence. */
-        private const val SAMPLE_MS = 2000L
+        internal const val SAMPLE_MS = 2000L
 
         /**
          * Bulle greffée sur la surface du clavier (`SurfaceControlViewHost`).
@@ -67,19 +59,12 @@ class OverlayService : Service() {
          * l'ouverture depuis le focus : la bulle y restait affichée après la fermeture de
          * l'application et n'apparaissait toujours qu'après l'animation. Ne pas y revenir.
          */
-        private const val ATTACHED_OVERLAY = true
+        internal const val ATTACHED_OVERLAY = true
         /** Touche de dictée : mêmes proportions qu'une touche de la rangée du bas. */
-        private const val KEY_W_DP = 56
-        private const val KEY_H_DP = 44
+        internal const val KEY_W_DP = 56
+        internal const val KEY_H_DP = 44
         /** Part de la largeur du clavier laissée à sa gauche (touches ?123 et virgule). */
-        private const val KEY_LEFT_RATIO = 0.24f
-
-        /** Artefacts connus de whisper sur du silence : à ne pas publier. */
-        private val ARTIFACTS = setOf(
-            "Sous-titres par la communauté d'Amara.org",
-            "Sous-titres réalisés par la communauté d'Amara.org",
-            "Merci d'avoir regardé cette vidéo",
-        )
+        internal const val KEY_LEFT_RATIO = 0.24f
 
         @Volatile
         var running = false
@@ -112,21 +97,22 @@ class OverlayService : Service() {
         }
     }
 
-    private lateinit var wm: WindowManager
-    private lateinit var root: LinearLayout
-    private lateinit var key: FrameLayout
-    private lateinit var keyView: WaveBarsView
-    private lateinit var params: WindowManager.LayoutParams
+    // Champs des vues (`BubbleView.kt`) et de la géométrie du clavier (`BubblePlacement.kt`).
+    internal lateinit var wm: WindowManager
+    internal lateinit var root: LinearLayout
+    internal lateinit var key: FrameLayout
+    internal lateinit var keyView: WaveBarsView
+    internal lateinit var params: WindowManager.LayoutParams
 
     /** Dernière zone clavier stable (emplacement connu, gardé même après fermeture). */
-    private var keyboard: Rect? = null
+    internal var keyboard: Rect? = null
     /** Dernière lecture brute, et l'instant où elle a été vue pour la première fois. */
-    private var candidate: Rect? = null
-    private var candidateMs = 0L
-    private var lastKbMs = 0L
+    internal var candidate: Rect? = null
+    internal var candidateMs = 0L
+    internal var lastKbMs = 0L
     /** Vrai après une perte de focus : Gboard se referme encore, on ne doit pas réafficher la bulle. */
-    private var hiddenByFocus = false
-    private var kbSeen = false
+    internal var hiddenByFocus = false
+    internal var kbSeen = false
     /** Libération différée du modèle : annulée dès qu'une nouvelle dictée commence. */
     private val releaseModel = Runnable {
         runCatching { ParakeetEngine.release() }
@@ -135,44 +121,40 @@ class OverlayService : Service() {
     /** Dernière tentative de recréation de la fenêtre (anti-boucle). */
     private var lastReattachMs = 0L
     /** Dernier échec d'attachement à la fenêtre du clavier (anti-boucle). */
-    private var lastAttachFailMs = 0L
+    internal var lastAttachFailMs = 0L
 
     // Surcouche attachée à la fenêtre du clavier (API 34+) : elle est composée dans la fenêtre de
     // Gboard, donc elle suit ses animations sans polling ni recalage. Sinon, repli WindowManager.
-    private var host: SurfaceControlViewHost? = null
-    private var overlaySc: SurfaceControl? = null
-    private var attachedId = 0
+    internal var host: SurfaceControlViewHost? = null
+    internal var overlaySc: SurfaceControl? = null
+    internal var attachedId = 0
     /** Dernier instant où la fenêtre du clavier a été vue (délai de grâce avant libération). */
-    private var lastImeMs = 0L
+    internal var lastImeMs = 0L
     /** Instant où la fenêtre du clavier a été vue pour la première fois (diagnostic de latence). */
-    private var imeSeenMs = 0L
+    internal var imeSeenMs = 0L
     /** Vrai quand le clavier était ouvert au dernier tick (une réouverture force un rattachement). */
-    private var kbWasVisible = false
-    private var posX = 0
-    private var posY = 0
+    internal var kbWasVisible = false
+    internal var posX = 0
+    internal var posY = 0
     /** Dernière capture de la couleur du clavier (anti-rebond : une par ouverture). */
-    private var lastSampleMs = 0L
-    private val attachMode: Boolean
-        get() = canAttach && VoxkeyAccessibilityService.instance != null
-
-    /** Greffage possible sur la fenêtre du clavier : API 34+, et seulement si on l'a choisi.
-     *  Décision indépendante de la connexion d'accessibilité : `buildViews` doit savoir s'il
-     *  pose une fenêtre WindowManager ou non, et la connexion arrive souvent après `onCreate`.
-     *  Poser la fenêtre puis greffer laissait la première orpheline à l'écran. */
-    private val canAttach: Boolean
-        get() = ATTACHED_OVERLAY && Build.VERSION.SDK_INT >= 34
-    private val main = Handler(Looper.getMainLooper())
+    internal var lastSampleMs = 0L
+    internal val main = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("voxkey", MODE_PRIVATE) }
 
     private var recorder: Recorder? = null
 
     @Volatile
-    private var recording = false
+    internal var recording = false
 
     /** Texte actuellement présent dans le champ (thread principal seulement). */
     private var pushed = ""
     /** Application active au début de la dictée : le texte n'est inséré que si on y est encore. */
     private var startPkg: String? = null
+
+    // `this::root.isInitialized` lit le champ de stockage : hors de la classe, seuls ces
+    // accesseurs sont compilables (utilisés par `BubbleView.kt` et `BubblePlacement.kt`).
+    internal val rootReady: Boolean get() = this::root.isInitialized
+    internal val keyReady: Boolean get() = this::key.isInitialized
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -225,54 +207,6 @@ class OverlayService : Service() {
         main.post(poll)
     }
 
-    /**
-     * Traite une lecture de la zone clavier (événement d'accessibilité ou poll).
-     *
-     * Pendant l'animation du clavier, Gboard fait varier sa zone à chaque frame : la bulle ne suit
-     * que les valeurs stables (SETTLE_MS), sinon elle « monte » avec le clavier. Elle apparaît tout
-     * de suite à la dernière position stable connue, et disparaît dès que le clavier n'est plus lu.
-     */
-    private fun onKeyboardRead(kb: Rect?) {
-        // Mode attaché : la surface suit la fenêtre du clavier d'elle-même. Aucun recalage.
-        if (attachMode) {
-            checkIme(SystemClock.uptimeMillis())
-            return
-        }
-        val now = SystemClock.uptimeMillis()
-        if ((kb != null) != kbSeen) {
-            kbSeen = kb != null
-            Log.d("VXK", if (kb == null) "kb lost" else "kb on $kb")
-        }
-        if (kb == null) {
-            // `imeBounds()` renvoie parfois null une frame sur deux pendant que Gboard bouge :
-            // on ne masque qu'après une absence continue, sinon la bulle clignote hors écran.
-            if (now - lastKbMs > HIDE_GRACE_MS) {
-                candidate = null
-                if (!recording) root.visibility = View.GONE
-            }
-            return
-        }
-        lastKbMs = now
-        if (kb != candidate) {
-            candidate = kb
-            candidateMs = now
-        }
-        val stable = now - candidateMs >= SETTLE_MS
-        if (stable) keyboard = kb
-        when {
-            recording -> if (stable) moveToKeyboard()
-            root.visibility != View.VISIBLE ->
-                // Un clavier visible implique un champ : plus besoin de `hiddenByFocus` ici,
-                // que les ROM ne renseignent pas de façon fiable sur les champs custom.
-                if (keyboard != null) {
-                    Log.d("VXK", "reveal hidden=$hiddenByFocus kb=$keyboard")
-                    moveToKeyboard()
-                    reveal()
-                }
-            stable -> moveToKeyboard()
-        }
-    }
-
     /** Filet de sécurité : relit le clavier à intervalle court, et gère l'enregistrement. */
     private val poll = object : Runnable {
         override fun run() {
@@ -310,58 +244,6 @@ class OverlayService : Service() {
         }
     }
 
-    /**
-     * Suit la fenêtre du clavier pour y accrocher ou décrocher la bulle.
-     *
-     * Appelée par le tick de 50 ms **et** par les événements d'accessibilité : la géométrie du
-     * clavier est publiée par le système par à-coups (on l'a vue sauter de « fermé » à « ouvert »
-     * sans valeur intermédiaire), donc attendre le tick suivant ne fait qu'ajouter du retard.
-     */
-    private fun checkIme(now: Long) {
-        // La surface suit la fenêtre du clavier : une fois accrochée, elle glisse et disparaît
-        // avec lui. Seul le rattachement à une nouvelle ouverture est de notre ressort.
-        val a11y = VoxkeyAccessibilityService.instance ?: return
-        val w = a11y.imeWindow()
-        // Un seul pixel de clavier visible suffit : accrochée dès le début de la montée, la
-        // surface suit ensuite l'animation d'elle-même. Attendre que le clavier soit levé de
-        // 150 px ajoutait exactement le délai qu'on voyait à l'ouverture.
-        // Sauf qu'une fenêtre basse (barre repliée, 37 px mesurés) n'est pas un clavier : la
-        // placer et l'échantillonner dessus donnait une bulle noire collée en bas.
-        val visible = w != null && w.first.top < wm.currentWindowMetrics.bounds.height() &&
-            w.first.height() > dp(120)
-        if (!visible) {
-            // Clavier fermé : c'est ici que se jouait le bug de la bulle qui ne revenait jamais.
-            // `imeWindow()` manque parfois une frame pendant l'animation, donc on note la fermeture
-            // tout de suite (une réouverture doit rattacher) mais on ne libère la surface qu'après
-            // une absence continue — sinon chaque ouverture clignotait.
-            kbWasVisible = false
-            imeSeenMs = 0L
-            // Une dictée en cours garde sa surface même si Gboard se referme (bouton retour).
-            if (overlaySc != null && !recording && now - lastImeMs > HIDE_GRACE_MS) detachBubble()
-            return
-        }
-        lastImeMs = now
-        // Diagnostic de latence : `ime seen` marque l'instant où la fenêtre du clavier apparaît,
-        // et les lignes `attach`/`reparent` donnent le retard réel avant que la bulle soit posée.
-        if (imeSeenMs == 0L) {
-            imeSeenMs = now
-            Log.d("VXK", "ime seen id=${w.second} top=${w.first.top} t=$now")
-        }
-        val sc = overlaySc
-        when {
-            sc == null -> attachTo(w.second, w.first)
-            // Réouverture du clavier : on rattache toujours la surface à la fenêtre courante.
-            // Le système réutilise le même id d'une ouverture à l'autre, et la surface d'une
-            // fenêtre détruite ne revient jamais d'elle-même — c'est pour ça que la bulle
-            // manquait à la réouverture. Un id inchangé ne prouve donc rien.
-            w.second != attachedId || !kbWasVisible -> reparentTo(a11y, w.second, w.first)
-        }
-        // Fin de dictée clavier fermé : `stopSession` a masqué la vue, mais la surface reste
-        // accrochée — sans ça, rien ne la remettait visible à la réouverture du clavier.
-        if (root.visibility != View.VISIBLE) reveal()
-        kbWasVisible = true
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Une connexion d'accessibilité renouvelée détruit les fenêtres qui en dépendent ;
         // le service, lui, survit : on recrée la sienne, sinon elle ne revient jamais.
@@ -369,43 +251,6 @@ class OverlayService : Service() {
             main.post { reattach() }
         }
         return START_STICKY
-    }
-
-    /** Recrée la fenêtre de la bulle (l'ancienne est orpheline, `visibility` n'y fait plus rien).
-     *  Le WindowManager est repris sur la connexion d'accessibilité courante : celui capturé au
-     *  démarrage porte le jeton de la connexion précédente, et `addView` échoue alors en
-     *  `BadTokenException` — la bulle ne revenait jamais. */
-    private fun reattach() {
-        if (!running) return
-        // En mode attaché, `root` n'appartient à aucune fenêtre WindowManager : l'ajouter ici en
-        // ferait une fenêtre flottante classique, et la surface ne pourrait plus l'héberger.
-        if (canAttach) {
-            // Rien à réparer tant qu'aucune surface n'est accrochée : au démarrage à froid,
-            // `EXTRA_REBUILD` arrive juste après `onCreate` et provoquait un second attachement
-            // (deux hôtes de surface pour une seule bulle).
-            if (overlaySc != null) detachBubble()
-            return
-        }
-        try {
-            wm.removeView(root)
-        } catch (_: Exception) {
-        }
-        try {
-            val a11y = VoxkeyAccessibilityService.instance
-            wm = (a11y ?: this).getSystemService(WINDOW_SERVICE) as WindowManager
-            params.type = if (a11y != null)
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            // WMS réécrit `token` dans nos params au premier ajout : le garder ferait échouer
-            // tous les ajouts suivants en `BadTokenException` (connexion morte).
-            params.token = null
-            wm.addView(root, params)
-            root.visibility = if (recording) View.VISIBLE else View.GONE
-            Log.d("VXK", "reattach ok a11y=${a11y != null}")
-        } catch (t: Throwable) {
-            Log.e("VXK", "reattach failed", t)
-        }
     }
 
     override fun onDestroy() {
@@ -431,281 +276,9 @@ class OverlayService : Service() {
         super.onDestroy()
     }
 
-    // ---------------------------------------------------------------- vues
-
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-
-    private fun buildViews() {
-        root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.START
-        }
-
-        // Touche de dictée : même matière et même rayon qu'une touche Gboard.
-        keyView = WaveBarsView(this)
-
-        key = FrameLayout(this).apply {
-            contentDescription = getString(R.string.a11y_dictate)
-            isClickable = true
-            background = keyBackground(active = false)
-            foreground = RippleDrawable(
-                ColorStateList.valueOf(0x1FFFFFFF),
-                null,
-                GradientDrawable().apply { cornerRadius = dp(9).toFloat(); setColor(Color.WHITE) }
-            )
-            addView(keyView, FrameLayout.LayoutParams(dp(26), dp(20), Gravity.CENTER))
-            setOnClickListener { toggleRecording() }
-        }
-
-        root.addView(key, LinearLayout.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP)))
-        applyBubbleColor()
-
-        params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (VoxkeyAccessibilityService.instance != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                // sans ça, y est relatif à la zone sous la barre d'état : la bulle sortait de l'écran
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = dp(6)
-            y = dp(260)
-        }
-
-        // En mode attaché, la vue n'entre dans aucune fenêtre ici : elle sera hébergée par la
-        // surface attachée au clavier, à l'ouverture de celui-ci.
-        if (!canAttach) {
-            // `addView` peut échouer (jeton d'accessibilité mort) : sans filet, l'exception
-            // remontait à `onCreate` et tuait le processus du service, donc la bulle pour de bon.
-            try {
-                wm.addView(root, params)
-                root.visibility = View.GONE
-                Log.d("VXK", "window added type=${params.type} a11y=${VoxkeyAccessibilityService.instance != null}")
-            } catch (t: Throwable) {
-                Log.e("VXK", "window add failed", t)
-            }
-        }
-    }
-
-    /**
-     * Surface de touche : opaque, sans bordure, dans la couleur réglée (celle du clavier par
-     * défaut). Le liseré de l'écoute est porté par les bandes, pas par le fond.
-     */
-    private fun keyBackground(active: Boolean) = GradientDrawable().apply {
-        cornerRadius = dp(9).toFloat()
-        setColor(Bubble.background(this@OverlayService))
-    }
-
-    /** Applique le fond et l'encre des bandes : au montage, à chaque ouverture, après une lecture. */
-    private fun applyBubbleColor() {
-        if (!this::key.isInitialized) return
-        key.background = keyBackground(active = recording)
-        keyView.ink = Bubble.idleInk(this)
-        keyView.litInk = Bubble.litInk(this)
-    }
-
-    /**
-     * Lit la couleur du clavier, une fois par ouverture.
-     *
-     * Gboard n'expose aucun thème : la seule source est une capture de sa fenêtre, que le
-     * système limite en fréquence. La valeur est mémorisée, donc une capture ratée ou refusée
-     * laisse simplement le fond précédent.
-     */
-    private fun sampleBubbleColor() {
-        if (Bubble.mode(this) != Bubble.MODE_KEYBOARD) return
-        val now = SystemClock.uptimeMillis()
-        if (now - lastSampleMs < SAMPLE_MS) return
-        val a11y = VoxkeyAccessibilityService.instance ?: return
-        // Le clavier doit être levé : capturé pendant la montée, il n'est pas encore dessiné et
-        // la médiane sort en noir pur.
-        val w = a11y.imeWindow() ?: return
-        val kb = w.first
-        val screenH = wm.currentWindowMetrics.bounds.height()
-        if (kb.height() <= dp(120)) return
-        if (kb.top > screenH - dp(200)) return
-        if (kb.bottom > screenH + dp(24)) return
-        lastSampleMs = now
-        a11y.sampleKeyboardColor { color ->
-            Log.d("VXK", "sample=#${Integer.toHexString(color)}")
-            if (color == 0 || color == Bubble.sampled(this)) return@sampleKeyboardColor
-            Bubble.setSampled(this, color)
-            applyBubbleColor()
-        }
-    }
-
-    /** Affichage immédiat : pas d'animation d'entrée, qui ajouterait une frame invisible. */
-    private fun reveal() {
-        key.alpha = 1f
-        key.scaleX = 1f
-        key.scaleY = 1f
-        root.visibility = View.VISIBLE
-    }
-
-    /**
-     * Cale la touche dans le coin bas-gauche de la zone clavier, dans la rangée du bas.
-     *
-     * Le clavier appartient à Gboard : on ne peut pas dessiner dedans, mais le service
-     * d'accessibilité nous donne son rectangle exact (`AccessibilityWindowInfo`).
-     *
-     * - Vertical : on s'aligne sur la rangée du bas, au-dessus de la bande de navigation
-     *   système (que le clavier inclut dans ses bornes quand il est edge-to-edge).
-     * - Horizontal : on saute les deux touches du coin (`?123` et `,`) qui restent utilisables,
-     *   et on mord sur l'extrémité gauche de la barre d'espace — large de plusieurs touches,
-     *   elle reste tappable au centre.
-     */
-    /**
-     * Attache la bulle à la fenêtre du clavier.
-     *
-     * Sans permission supplémentaire, la surface devient un enfant de la fenêtre de Gboard : elle
-     * apparaît, glisse et disparaît avec lui. `focusable = false` est indispensable, sinon la
-     * surcouche prend le focus au champ texte et le clavier ne revient plus (`setView(v, w, h)`
-     * crée justement une fenêtre focalisable).
-     */
-    /** Crée l'hôte de surface une fois : il héberge [root] dans la fenêtre du clavier. */
-    private fun ensureHost() {
-        if (host != null) return
-        val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
-        val hostView = SurfaceControlViewHost(this, display, null as IBinder?)
-        hostView.setView(root, SurfaceControlViewHost.LayoutParams(dp(KEY_W_DP), dp(KEY_H_DP), false))
-        host = hostView
-    }
-
-    private fun attachTo(id: Int, kb: Rect) {
-        val a11y = VoxkeyAccessibilityService.instance ?: return
-        val now = SystemClock.uptimeMillis()
-        // Un attachement qui échoue était retenté à chaque tick (20 fois par seconde), en créant
-        // une surface à chaque fois : elle restait vivante à la sortie de `attachTo` et la bulle
-        // clignotait.
-        if (now - lastAttachFailMs < 150) return
-        try {
-            // Hôte unique, créé une seule fois : une vue ne peut appartenir qu'à un seul hôte, et
-            // `SurfaceControlViewHost.setView` deux fois sur la même vue échoue en silence.
-            if (host == null) {
-                buildViews()
-                ensureHost()
-            }
-            val sc = host?.surfacePackage?.surfaceControl
-                ?: throw IllegalStateException("surface absente")
-            // La surface du ViewHost naît masquée (cf. test CTS) : l'allumer explicitement.
-            SurfaceControl.Transaction().setVisibility(sc, true).apply()
-            a11y.attachAccessibilityOverlayToWindow(id, sc)
-            overlaySc = sc
-            attachedId = id
-            placeAttached(sc, kb)
-            root.visibility = View.VISIBLE
-            // Hiérarchie reconstruite : la touche doit reprendre son état d'écoute en cours.
-            keyView.active = recording
-            Log.d("VXK", "attach ok id=$id kb=$kb pos=$posX,$posY lag=${SystemClock.uptimeMillis() - imeSeenMs} t=${SystemClock.uptimeMillis()}")
-        } catch (t: Throwable) {
-            Log.e("VXK", "attach failed", t)
-            lastAttachFailMs = now
-            detachBubble()
-        }
-    }
-
-    /** Nouvelle fenêtre de clavier (autre application) : la même surface y est replacée. */
-    private fun reparentTo(a11y: VoxkeyAccessibilityService, id: Int, kb: Rect) {
-        val sc = overlaySc ?: run { attachTo(id, kb); return }
-        try {
-            // Une surface rattachée à une fenêtre morte a pu être masquée avec elle : on la
-            // rallume à chaque rattachement, sinon elle reste invisible sur la nouvelle fenêtre.
-            SurfaceControl.Transaction().setVisibility(sc, true).apply()
-            a11y.attachAccessibilityOverlayToWindow(id, sc)
-            attachedId = id
-            placeAttached(sc, kb)
-            Log.d("VXK", "reparent ok id=$id kb=$kb lag=${SystemClock.uptimeMillis() - imeSeenMs} t=${SystemClock.uptimeMillis()}")
-        } catch (t: Throwable) {
-            Log.e("VXK", "reparent failed", t)
-            // L'ancienne fenêtre est morte avec la surface : on repart d'un hôte neuf.
-            detachBubble()
-            lastAttachFailMs = SystemClock.uptimeMillis()
-        }
-    }
-
-    private fun detachBubble() {
-        val sc = overlaySc
-        overlaySc = null
-        attachedId = 0
-        kbWasVisible = false
-        imeSeenMs = 0L
-        if (sc != null) {
-            try {
-                SurfaceControl.Transaction().reparent(sc, null).apply()
-            } catch (t: Throwable) {
-                Log.e("VXK", "detach failed", t)
-            }
-        }
-        host?.release()
-        host = null
-    }
-
-    /**
-     * Position dans le repère de la surface du clavier.
-     *
-     * Ce repère n'est pas celui des 883 px visibles du clavier : la surface de la fenêtre IME
-     * couvre tout l'écran sous la barre d'état. Vérifié au compositeur —
-     * `VRI-InputMethod` occupe 0,126 → 1080,2392 sur un écran de 2392 px. Son origine est donc le
-     * haut de la barre d'état, et son bas celui de l'écran ; rien de la géométrie du clavier
-     * n'entre dans le calcul, ce qui rend la position insensible aux animations de Gboard.
-     *
-     * Sans le « +50 px » du placement historique : la couche est découpée aux bornes de la
-     * surface parente, qui s'arrête au bas de l'écran.
-     */
-    private fun placeAttached(sc: SurfaceControl, kb: Rect) {
-        val metrics = wm.currentWindowMetrics
-        val screenBottom = metrics.bounds.height()
-        val top = metrics.windowInsets.getInsets(WindowInsets.Type.statusBars()).top
-        if (Bubble.custom(this)) {
-            // Fractions du clavier : la bulle suit la rotation, un écran plié et la hauteur
-            // variable du clavier, sans réglage par appareil.
-            // Au moment du rattachement, le clavier n'a pas fini de monter : sa fenêtre est encore
-            // collée en bas (mesurée à 38 px de haut, débordant sous l'écran) alors que sa hauteur
-            // définitive, elle, est déjà bonne. On ancre donc sur le bas de l'écran, où le clavier
-            // finit toujours, et sur la hauteur de la fenêtre.
-            val w = dp(KEY_W_DP)
-            val h = dp(KEY_H_DP)
-            val kh = kb.height()
-            posX = (kb.left + Bubble.x(this) * (kb.width() - w)).toInt()
-            posY = (screenBottom - top - dp(4) - h - (1f - Bubble.y(this)) * (kh - h - dp(4))).toInt()
-        } else {
-            // Position d'origine, gardée telle quelle tant que l'utilisateur n'a rien réglé.
-            posX = (kb.width() * KEY_LEFT_RATIO).toInt() - 30
-            posY = screenBottom - dp(KEY_H_DP) - dp(4) - top
-        }
-        SurfaceControl.Transaction().setPosition(sc, posX.toFloat(), posY.toFloat()).setLayer(sc, 1).apply()
-        applyBubbleColor()
-        // Capture après la fin de l'animation, avec une seconde chance : pendant la montée, la
-        // fenêtre du clavier laisse voir l'application derrière et la médiane prendrait sa couleur.
-        main.postDelayed({ sampleBubbleColor() }, 500)
-        main.postDelayed({ sampleBubbleColor() }, 1300)
-        Log.d("VXK", "place pos=$posX,$posY ecran=$screenBottom haut=$top")
-    }
-
-    private fun moveToKeyboard() {
-        val kb = keyboard ?: return
-        // Fenêtre morte ou pas encore posée : `updateViewLayout` lèverait.
-        if (!this::root.isInitialized || !root.isAttachedToWindow) return
-        val metrics = wm.currentWindowMetrics
-        val screenBottom = metrics.bounds.height()
-        val nav = metrics.windowInsets.getInsets(WindowInsets.Type.navigationBars()).bottom
-        // Bornes du clavier incluant déjà la barre de navigation ? On ne la retire qu'une fois.
-        val keyAreaBottom = if (kb.bottom > screenBottom - nav) kb.bottom - nav else kb.bottom
-
-        val x = kb.left + (kb.width() * KEY_LEFT_RATIO).toInt() - 30 // 30 px à gauche, demande utilisateur
-        val y = keyAreaBottom - dp(KEY_H_DP) - dp(4) + 50 // 50 px plus bas au total, demande utilisateur
-        if (params.x == x && params.y == y) return
-        params.x = x
-        params.y = y
-        wm.updateViewLayout(root, params)
-    }
-
     // ----------------------------------------------------------- dictée
 
-    private fun toggleRecording() {
+    internal fun toggleRecording() {
         // Une dictée est encore en cours de transcription : en démarrer une autre ferait écrire
         // deux textes dans le même champ (le résultat précédent arrive après).
         if (!recording && keyView.busy) return
@@ -744,27 +317,6 @@ class OverlayService : Service() {
         // le clavier peut s'être ouvert entre-temps : on se recale avant d'afficher le texte
         moveToKeyboard()
 
-    }
-
-    /** Retire les jetons de whisper entre crochets, les notes ♪ et les artefacts connus. */
-    private fun cleanWhisper(text: String): String {
-        if (ARTIFACTS.any { text.contains(it) }) return ""
-        return text.replace(Regex("\\[[^\\]]*\\]|♪"), " ").replace(Regex("\\s+"), " ").trim()
-    }
-
-    /**
-     * Une abréviation dictée seule devient le texte complet enregistré pour ce mot-clé.
-     * Correspondance sur la dictée entière uniquement : « signature » est aussi un mot courant,
-     * l'étendre au milieu d'une phrase abîmerait le texte.
-     */
-    private fun expandKeywords(text: String): String {
-        if (text.isBlank()) return text
-        val bare = text.trim().trimEnd('.', '!', '?', ',', ';', ':', ' ').lowercase()
-        val hit = runCatching {
-            Store.keywords().firstOrNull { it.trigger.trim().lowercase() == bare }
-        }.getOrNull() ?: return text
-        Log.d("VXK", "keyword « ${hit.trigger} » → ${hit.replacement.length} chars")
-        return hit.replacement
     }
 
     /** Charge le modèle en tâche de fond : `ensure()` au stop le trouvera déjà prêt. */
