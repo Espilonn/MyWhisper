@@ -1,7 +1,11 @@
 package dev.voxkey.bench
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Build
 import android.widget.LinearLayout
+import android.widget.Toast
 import java.time.LocalDate
 
 /** Historique : les dictées enregistrées, groupées par jour, avec suppression. */
@@ -57,8 +61,18 @@ class HistoryScreen(private val act: Activity, private val ui: UiKit) {
         over = ui.t(R.string.history_row_meta, timeLabel(d.ts), ui.q(R.plurals.words, d.words)),
         glyphIcon = R.drawable.ic_delete,
         glyphDesc = ui.t(R.string.history_delete_desc),
+        onOpen = { copy(d.text) },
         onGlyph = { confirmDelete(d) },
     )
+
+    /** Le texte entier part dans le presse-papiers ; Android 13+ affiche déjà sa propre confirmation. */
+    private fun copy(text: String) {
+        val cm = act.getSystemService(ClipboardManager::class.java)
+        cm.setPrimaryClip(ClipData.newPlainText("MyWhisper", text))
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(act, ui.t(R.string.history_copied), Toast.LENGTH_SHORT).show()
+        }
+    }
 
     /** La suppression est définitive : on demande confirmation avant d'effacer. */
     private fun confirmDelete(d: Dictation) {

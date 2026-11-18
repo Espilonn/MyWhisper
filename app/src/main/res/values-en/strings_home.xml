@@ -45,6 +45,7 @@
     <string name="history_empty_title">No dictations</string>
     <string name="history_empty_body">Every dictation is kept here. Open a text field, then tap the dictation key.</string>
     <string name="history_row_meta">%1$s · %2$s</string>
+    <string name="history_copied">Copied</string>
     <string name="history_delete_desc">Delete this dictation</string>
     <string name="history_delete_title">Delete this dictation?</string>
     <string name="history_delete_message">“%1$s” will be deleted for good.</string>

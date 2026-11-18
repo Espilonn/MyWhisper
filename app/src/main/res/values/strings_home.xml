@@ -45,6 +45,7 @@
     <string name="history_empty_title">Aucune dictée</string>
     <string name="history_empty_body">Chaque texte dicté est gardé ici. Ouvre un champ de texte, puis appuie sur la touche de dictée.</string>
     <string name="history_row_meta">%1$s · %2$s</string>
+    <string name="history_copied">Copié</string>
     <string name="history_delete_desc">Supprimer cette dictée</string>
     <string name="history_delete_title">Supprimer cette dictée\u00A0?</string>
     <string name="history_delete_message">« %1$s » sera effacée pour de bon.</string>
