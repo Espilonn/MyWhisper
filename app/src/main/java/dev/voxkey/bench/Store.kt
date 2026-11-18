@@ -186,7 +186,7 @@ object Store {
 
     // -------------------------------------------------------------- schéma
 
-    private class Helper(ctx: Context) : SQLiteOpenHelper(ctx, "voxkey.db", null, 1) {
+    private class Helper(ctx: Context) : SQLiteOpenHelper(ctx, "voxkey.db", null, 2) {
 
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
@@ -203,8 +203,12 @@ object Store {
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, trigger TEXT NOT NULL UNIQUE, " +
                     "replacement TEXT NOT NULL)",
             )
+            // Les stats filtrent toutes sur ts : sans cet index elles balaient la table entière.
+            db.execSQL("CREATE INDEX dictation_ts ON dictation(ts)")
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) db.execSQL("CREATE INDEX IF NOT EXISTS dictation_ts ON dictation(ts)")
+        }
     }
 }

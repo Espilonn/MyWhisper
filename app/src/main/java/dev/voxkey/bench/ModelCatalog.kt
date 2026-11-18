@@ -46,6 +46,7 @@ object ModelCatalog {
         val dest = File(dir, file)
         thread(name = "voxkey-download") {
             val part = File(dir, "$file.part")
+            var expected = -1L
             try {
                 try {
                     val conn = (URL(url(file)).openConnection() as HttpURLConnection).apply {
@@ -59,6 +60,7 @@ object ModelCatalog {
                             return@thread
                         }
                         val total = conn.contentLengthLong
+                        expected = total
                         conn.inputStream.use { input ->
                             part.outputStream().use { out ->
                                 val buf = ByteArray(256 * 1024)
@@ -80,6 +82,14 @@ object ModelCatalog {
                         conn.disconnect()
                     }
 
+                    // Le serveur annonce la taille : un fichier plus court est un téléchargement
+                    // coupé, pas un modèle valide. Sans ce contrôle, un fichier tronqué passait
+                    // le seuil du Mo et n'échouait qu'au chargement du modèle.
+                    if (expected > 0 && part.length() != expected) {
+                        part.delete()
+                        onError(ctx.getString(R.string.catalog_error_partial))
+                        return@thread
+                    }
                     if (part.length() < 1_000_000) {
                         part.delete()
                         onError(ctx.getString(R.string.catalog_error_partial))
