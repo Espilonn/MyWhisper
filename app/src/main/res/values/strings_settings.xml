@@ -132,31 +132,6 @@
     <string name="nav_keywords">Mots-clés</string>
     <string name="nav_history">Historique</string>
     <string name="nav_dictionary">Dictionnaire</string>
-    <string name="nav_bench">Bench</string>
-
-    <!-- Onglet Benchmark : mêmes prises passées au modèle local et à l'API. -->
-    <string name="bench_tab">Benchmark</string>
-    <string name="bench_tab_sub">Local contre API, sur trois prises identiques.</string>
-    <string name="bench_takes">Prises</string>
-    <string name="bench_take">Enregistrer la prise %1$d</string>
-    <string name="bench_redo">Refaire la prise %1$d</string>
-    <string name="bench_take_empty">Vide</string>
-    <string name="bench_take_ready">%1$d s · %2$d échantillons</string>
-    <string name="bench_take_quiet"> · trop faible</string>
-    <string name="bench_compare_card">Comparaison</string>
-    <string name="bench_compare">Comparer local et API</string>
-    <string name="bench_need_mic">Micro refusé</string>
-    <string name="bench_recording">Enregistrement de la prise %1$d…</string>
-    <string name="bench_need_audio">Enregistre au moins une prise.</string>
-    <string name="bench_measuring">Mesure en cours…</string>
-    <string name="bench_done">Terminé</string>
-    <string name="bench_no_local">Local : aucun modèle installé</string>
-    <string name="bench_local_failed">Local : le modèle n\'a pas pu être chargé</string>
-    <string name="bench_no_key">API : aucune clé enregistrée</string>
-    <string name="bench_take_head">Prise %1$d · %2$d s</string>
-    <string name="bench_row_error">%1$s : %2$s</string>
-    <string name="bench_average">moyenne   local %1$d ms · API %2$d ms</string>
-    <string name="bench_verdict">plus rapide : %1$s, de %2$d ms</string>
 
     <!-- Banc d'essai -->
     <string name="bench_title">Banc d\'essai</string>
