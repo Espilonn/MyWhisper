@@ -309,10 +309,15 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
                 listOf("Groq", "OpenRouter"),
                 if (RemoteEngine.provider(act) == RemoteEngine.OPENROUTER) 1 else 0
             ) { i ->
+                val before = RemoteEngine.provider(act)
                 val p = if (i == 0) RemoteEngine.GROQ else RemoteEngine.OPENROUTER
+                // Le champ appartient encore au fournisseur précédent : on le range chez lui
+                // avant de charger la clé de l'autre.
+                RemoteEngine.saveKey(act, before, keyInput.text.toString())
                 prefs.edit().putString(RemoteEngine.PREF_PROVIDER, p)
                     .putString(RemoteEngine.PREF_MODEL, RemoteEngine.defaultModel(p)).apply()
                 modelInput.setText(RemoteEngine.defaultModel(p))
+                keyInput.setText(RemoteEngine.key(act, p))
                 cloudStatus.text = ""
             }, 14
         )
@@ -718,10 +723,8 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     }
 
     private fun saveCloudKey() {
-        prefs.edit()
-            .putString(RemoteEngine.PREF_MODEL, modelInput.text.toString().trim())
-            .putString(RemoteEngine.PREF_KEY, keyInput.text.toString().trim())
-            .apply()
+        prefs.edit().putString(RemoteEngine.PREF_MODEL, modelInput.text.toString().trim()).apply()
+        RemoteEngine.saveKey(act, RemoteEngine.provider(act), keyInput.text.toString())
     }
 
     private fun testCloud() {

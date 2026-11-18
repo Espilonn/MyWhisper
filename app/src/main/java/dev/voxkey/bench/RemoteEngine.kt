@@ -18,6 +18,8 @@ object RemoteEngine {
     const val PREF_ENGINE = "engine"           // "local" (défaut) ou "cloud"
     const val PREF_PROVIDER = "cloud_provider" // "groq" ou "openrouter"
     const val PREF_MODEL = "cloud_model"
+
+    /** Ancienne clé unique, d'avant la séparation par fournisseur : relue une fois puis effacée. */
     const val PREF_KEY = "cloud_key"
 
     const val GROQ = "groq"
@@ -35,9 +37,32 @@ object RemoteEngine {
     fun model(c: Context) =
         prefs(c).getString(PREF_MODEL, null)?.takeIf { it.isNotBlank() } ?: defaultModel(provider(c))
 
-    // shortcut: clé en clair dans les préférences privées de l'app (illisibles sans root) ;
-    // passer au Keystore si l'app doit résister à un appareil rooté.
-    fun key(c: Context) = prefs(c).getString(PREF_KEY, null).orEmpty().trim()
+    // shortcut: la clé est chiffrée par le Keystore (voir Secrets) mais reste lisible par l'app
+    // elle-même ; suffisant contre une copie du fichier, pas contre un appareil rooté.
+    fun key(c: Context) = key(c, provider(c))
+
+    /** Clé du fournisseur demandé : chacune la sienne, donc changer d'API ne perd pas l'autre. */
+    fun key(c: Context, provider: String): String {
+        val p = prefs(c)
+        val mine = p.getString(keyPref(provider), null)
+        if (mine != null) return Secrets.open(mine).trim()
+
+        // Migration : la clé unique de la version précédente appartenait à Groq par défaut.
+        val legacy = if (provider == GROQ) p.getString(PREF_KEY, null) else null
+        if (legacy.isNullOrBlank()) return ""
+        val plain = Secrets.open(legacy).trim()
+        saveKey(c, GROQ, plain)
+        p.edit().remove(PREF_KEY).apply()
+        return plain
+    }
+
+    fun saveKey(c: Context, provider: String, value: String) {
+        val v = value.trim()
+        prefs(c).edit().putString(keyPref(provider), if (v.isEmpty()) "" else Secrets.seal(v)).apply()
+    }
+
+    private fun keyPref(provider: String) =
+        if (provider == OPENROUTER) "cloud_key_openrouter" else "cloud_key_groq"
 
     private fun transcriptionUrl(p: String) = if (p == OPENROUTER)
         "https://openrouter.ai/api/v1/audio/transcriptions"
