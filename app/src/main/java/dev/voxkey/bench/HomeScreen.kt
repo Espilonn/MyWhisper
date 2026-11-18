@@ -1,10 +1,12 @@
 package dev.voxkey.bench
 
 import android.app.Activity
+import android.content.pm.ApplicationInfo
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import java.time.LocalDate
 import kotlin.math.abs
@@ -60,6 +62,22 @@ class HomeScreen(
         checkUpdate()
         paintStatus()
         render()
+    }
+
+    /** Version de debug seulement : rappelle d'où vient le texte, jamais dans un build release. */
+    private val debugBadge: TextView? =
+        if ((act.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) ui.micro("") else null
+
+    private fun paintDebug() {
+        val badge = debugBadge ?: return
+        badge.text = if (RemoteEngine.isCloud(act)) {
+            ui.t(
+                R.string.debug_engine_cloud,
+                if (RemoteEngine.provider(act) == RemoteEngine.OPENROUTER) "OpenRouter" else "Groq",
+            )
+        } else {
+            ui.t(R.string.debug_engine_local)
+        }
     }
 
     /** Une seule vérification par lancement : le cache de 24 h évite d'interroger GitHub. */
@@ -138,6 +156,10 @@ class HomeScreen(
 
     private fun render() {
         body.removeAllViews()
+        debugBadge?.let { badge ->
+            paintDebug()
+            body.addView(badge, LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = ui.dp(10) })
+        }
         val days = dayCount
         val series = Store.wordsPerDay(days)
         val total = series.sum()

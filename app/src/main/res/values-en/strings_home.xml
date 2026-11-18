@@ -4,6 +4,9 @@
     <!-- Home -->
     <string name="home_tagline">Your dictation, on your phone</string>
     <string name="home_status_ready">●\u0020\u0020Ready</string>
+    <!-- Debug builds only: where the text comes from. -->
+    <string name="debug_engine_local">Debug · transcription on this device</string>
+    <string name="debug_engine_cloud">Debug · transcription via %1$s</string>
     <string name="home_configure">Set up</string>
     <string name="home_status_update">↑\u0020\u0020Update</string>
     <string name="update_title">MyWhisper %1$s</string>
