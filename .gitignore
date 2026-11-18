@@ -28,3 +28,6 @@ s*.png
 
 # Trailer : images intermédiaires du rendu
 trailer/frames/
+
+# graphify output (AST cache is ~88 MB)
+graphify-out/
