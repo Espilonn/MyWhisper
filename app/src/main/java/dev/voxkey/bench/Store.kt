@@ -15,29 +15,6 @@ data class WordEntry(val word: String, val count: Int, val manual: Boolean)
 
 data class Keyword(val id: Long, val trigger: String, val replacement: String)
 
-/** Mots-outils français : trop fréquents pour dire quoi que ce soit de l'utilisateur. */
-private val STOPWORDS = setOf(
-    "le", "la", "les", "de", "des", "du", "un", "une", "et", "ou", "à", "au", "aux",
-    "en", "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles", "que", "qui",
-    "quoi", "ce", "cette", "ces", "mon", "ton", "son", "ma", "ta", "sa", "mes", "tes",
-    "ses", "pour", "par", "dans", "sur", "avec", "pas", "plus", "est", "sont", "ai",
-    "as", "a", "ont", "être", "avoir", "fait", "mais", "ne", "ni", "y", "lui", "leur",
-    "qu", "se", "tout", "bien",
-)
-
-/**
- * Découpe un texte en mots du dictionnaire : ponctuation de bord retirée, mots-outils et
- * jetons d'un caractère écartés. La casse d'origine est conservée (le store compare en minuscules).
- */
-fun wordsIn(text: String): List<String> {
-    val out = ArrayList<String>()
-    for (token in text.split(Regex("\\s+"))) {
-        val w = token.trim { !it.isLetterOrDigit() }
-        if (w.length >= 2 && w.lowercase() !in STOPWORDS) out.add(w)
-    }
-    return out
-}
-
 object Store {
 
     @Volatile
@@ -200,8 +177,6 @@ object Store {
             return if (c.moveToFirst()) c.getInt(0) else 0
         }
     }
-
-    fun totalWords(): Int = totalWordsSince(0)
 
     fun dictationCount(): Int {
         db().rawQuery("SELECT COUNT(*) FROM dictation", null).use { c ->

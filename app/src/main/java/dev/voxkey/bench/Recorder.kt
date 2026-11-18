@@ -83,9 +83,6 @@ class Recorder {
         return out
     }
 
-    /** Les `n` derniers échantillons (fenêtre glissante des partiels). */
-    fun tail(n: Int): FloatArray = snapshot(n)
-
     fun stop(): FloatArray {
         running = false
         // Arrêter la capture AVANT le `join` : un `read` en cours ne rendrait pas la main, et

@@ -362,18 +362,6 @@ class OverlayService : Service() {
         kbWasVisible = true
     }
 
-    /** Repli quand la géométrie du clavier est introuvable : coin bas-gauche, au-dessus du clavier. */
-    private fun moveToRest() {
-        val metrics = wm.currentWindowMetrics
-        val nav = metrics.windowInsets.getInsets(WindowInsets.Type.navigationBars()).bottom
-        val x = dp(24)
-        val y = metrics.bounds.height() - nav - dp(KEY_H_DP) - dp(230)
-        if (params.x == x && params.y == y) return
-        params.x = x
-        params.y = y
-        wm.updateViewLayout(root, params)
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Une connexion d'accessibilité renouvelée détruit les fenêtres qui en dépendent ;
         // le service, lui, survit : on recrée la sienne, sinon elle ne revient jamais.
@@ -878,13 +866,6 @@ class OverlayService : Service() {
         val dir = modelDir() ?: return null
         val f = if (name != null) File(dir, name) else null
         if (f != null && f.exists()) return f.absolutePath
-        return dir.listFiles()?.filter { it.name.endsWith(".bin") }
-            ?.minByOrNull { it.length() }?.absolutePath
-    }
-
-    /** Les partiels utilisent le plus petit modèle disponible : plus réactif. */
-    private fun partialModelPath(): String? {
-        val dir = modelDir() ?: return null
         return dir.listFiles()?.filter { it.name.endsWith(".bin") }
             ?.minByOrNull { it.length() }?.absolutePath
     }

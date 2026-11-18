@@ -30,36 +30,6 @@ class StatsTest {
     }
 }
 
-/** Extraction des mots du dictionnaire (Store.kt) : ajouté en fin de fichier. */
-class WordsInTest {
-
-    @Test
-    fun wordsInKeepsInnerPunctuationAndDropsEdges() {
-        assertEquals(
-            listOf("Peux-tu", "m'envoyer", "devis", "avant", "vendredi"),
-            wordsIn("Peux-tu m'envoyer le devis avant vendredi ?"),
-        )
-        assertEquals(listOf("TVA", "2026"), wordsIn("  \"TVA\", (2026).  "))
-    }
-
-    @Test
-    fun wordsInDropsStopwordsAndSingleCharacters() {
-        assertEquals(emptyList<String>(), wordsIn("le la de un et a y ? - !"))
-        assertEquals(listOf("Gradle", "konfig"), wordsIn("le Gradle ... konfig"))
-    }
-
-    @Test
-    fun wordsInKeepsOriginalCase() {
-        assertEquals(listOf("Voxkey", "voxkey", "VOXKEY"), wordsIn("Voxkey (voxkey) VOXKEY!"))
-    }
-
-    @Test
-    fun wordsInHandlesEmptyText() {
-        assertEquals(emptyList<String>(), wordsIn(""))
-        assertEquals(emptyList<String>(), wordsIn("   "))
-    }
-}
-
 /** Libellés de date des écrans (Stats.kt) : ajouté en fin de fichier. */
 class DayLabelTest {
 
