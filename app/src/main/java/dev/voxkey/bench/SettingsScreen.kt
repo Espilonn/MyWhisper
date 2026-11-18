@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
 import android.provider.Settings
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
@@ -24,6 +25,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
+import kotlin.concurrent.thread
 
 /**
  * Réglages : mise en place (droits), modèle, dictée. La logique vient de l'ancien écran d'accueil
@@ -128,6 +130,13 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
     private lateinit var modelEmpty: TextView
     private lateinit var downloadBox: LinearLayout
     private lateinit var downloadStatus: TextView
+    /** Carte du modèle local : masquée quand la dictée passe par une API distante. */
+    private lateinit var modelCard: LinearLayout
+    private lateinit var cloudBox: LinearLayout
+    private lateinit var cloudStatus: TextView
+    private lateinit var modelInput: android.widget.EditText
+    private lateinit var keyInput: android.widget.EditText
+    private val prefs by lazy { act.getSharedPreferences("voxkey", Activity.MODE_PRIVATE) }
     private lateinit var deleteModel: Button
     private var modelFiles: List<File> = emptyList()
     private lateinit var setupProgress: TextView
@@ -281,7 +290,53 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         bubble.addFull(ui.meta(ui.t(R.string.settings_bubble_color_hint)), 10)
         content.addFull(bubble, 16)
 
-        val model = ui.card()
+        val engine = ui.card()
+        engine.addView(ui.label(ui.t(R.string.settings_engine)))
+        engine.addFull(
+            ui.segmented(
+                listOf(ui.t(R.string.settings_engine_local), ui.t(R.string.settings_engine_cloud)),
+                if (RemoteEngine.isCloud(act)) 1 else 0
+            ) { i ->
+                prefs.edit().putString(RemoteEngine.PREF_ENGINE, if (i == 0) "local" else "cloud").apply()
+                renderEngine()
+            }, 10
+        )
+        engine.addFull(ui.meta(ui.t(R.string.settings_engine_hint)), 8)
+
+        cloudBox = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+        cloudBox.addFull(
+            ui.segmented(
+                listOf("Groq", "OpenRouter"),
+                if (RemoteEngine.provider(act) == RemoteEngine.OPENROUTER) 1 else 0
+            ) { i ->
+                val p = if (i == 0) RemoteEngine.GROQ else RemoteEngine.OPENROUTER
+                prefs.edit().putString(RemoteEngine.PREF_PROVIDER, p)
+                    .putString(RemoteEngine.PREF_MODEL, RemoteEngine.defaultModel(p)).apply()
+                modelInput.setText(RemoteEngine.defaultModel(p))
+                cloudStatus.text = ""
+            }, 14
+        )
+        modelInput = ui.input(ui.t(R.string.settings_cloud_model_hint), RemoteEngine.model(act)).apply {
+            setOnFocusChangeListener { _, focused ->
+                if (!focused) saveCloudKey()
+            }
+        }
+        cloudBox.addFull(modelInput, 10)
+        keyInput = ui.input(ui.t(R.string.settings_cloud_key_hint), RemoteEngine.key(act)).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSelectAllOnFocus(true)
+            setOnFocusChangeListener { _, focused ->
+                if (!focused) saveCloudKey()
+            }
+        }
+        cloudBox.addFull(keyInput, 8)
+        cloudBox.addFull(ui.button(ui.t(R.string.settings_cloud_test), primary = false) { testCloud() }, 12)
+        cloudStatus = ui.meta("")
+        cloudBox.addFull(cloudStatus, 8)
+        engine.addFull(cloudBox, 4)
+        content.addFull(engine, 16)
+
+        val model = ui.card().also { modelCard = it }
         val modelHead = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -323,6 +378,7 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         downloadStatus = ui.meta("")
         model.addFull(downloadStatus, 12)
         content.addFull(model, 16)
+        renderEngine()
 
         val dictation = ui.card()
         dictation.addView(ui.label(ui.t(R.string.settings_dictation)))
@@ -652,6 +708,35 @@ class SettingsScreen(private val act: Activity, private val ui: UiKit) {
         }
         Toast.makeText(act, ui.t(R.string.settings_model_deleted), Toast.LENGTH_SHORT).show()
         refreshModels()
+    }
+
+    /** Local : la carte du modèle ; cloud : fournisseur, modèle, clé. */
+    private fun renderEngine() {
+        val cloud = RemoteEngine.isCloud(act)
+        cloudBox.visibility = if (cloud) View.VISIBLE else View.GONE
+        modelCard.visibility = if (cloud) View.GONE else View.VISIBLE
+    }
+
+    private fun saveCloudKey() {
+        prefs.edit()
+            .putString(RemoteEngine.PREF_MODEL, modelInput.text.toString().trim())
+            .putString(RemoteEngine.PREF_KEY, keyInput.text.toString().trim())
+            .apply()
+    }
+
+    private fun testCloud() {
+        saveCloudKey()
+        cloudStatus.setTextColor(Ui.MUTED)
+        cloudStatus.text = ui.t(R.string.settings_cloud_testing)
+        thread(name = "voxkey-key") {
+            val err = RemoteEngine.check(act)
+            act.runOnUiThread {
+                cloudStatus.setTextColor(if (err == null) Ui.GOOD else Ui.WARN)
+                cloudStatus.text =
+                    if (err == null) ui.t(R.string.settings_cloud_test_ok)
+                    else ui.t(R.string.settings_cloud_test_fail, err)
+            }
+        }
     }
 
     private fun startDownload(m: ModelCatalog.Remote) {

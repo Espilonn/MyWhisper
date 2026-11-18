@@ -781,6 +781,8 @@ class OverlayService : Service() {
 
     /** Charge le modèle en tâche de fond : `ensure()` au stop le trouvera déjà prêt. */
     private fun preloadModel() {
+        // En mode cloud, rien à charger : le modèle distant n'occupe pas la mémoire du téléphone.
+        if (RemoteEngine.isCloud(this)) return
         val model = selectedModelPath() ?: return
         thread(name = "voxkey-load") {
             // Un modèle absent ou corrompu lève ici ; sans filet, le thread non capturé tuait
@@ -809,17 +811,29 @@ class OverlayService : Service() {
         keyView.busy = true
         thread(name = "voxkey-final") {
             var finalText = ""
-            val model = selectedModelPath()
+            val cloud = RemoteEngine.isCloud(this@OverlayService)
+            val model = if (cloud) null else selectedModelPath()
             val parakeet = model?.let { isParakeetModel(it) } == true
             try {
-                val ready = if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
+                val ready = if (cloud) RemoteEngine.key(this@OverlayService).isNotBlank()
+                    else if (parakeet) ParakeetEngine.ensure(model!!) else model != null && WhisperEngine.ensure(model)
                 // porte de silence : sur du silence whisper hallucine ([Musique], sous-titres…)
                 if (pcm.size >= 8000 && Dsp.rms(pcm) > Dsp.SILENCE_RMS && ready) {
-                    finalText = expandKeywords(
-                        cleanWhisper(
-                            if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
-                        )
-                    )
+                    val raw = try {
+                        if (cloud) RemoteEngine.transcribe(this@OverlayService, pcm)
+                        else if (parakeet) ParakeetEngine.transcribe(pcm) else WhisperEngine.transcribe(pcm, "fr", 4)
+                    } catch (t: Throwable) {
+                        // Cloud en échec (réseau, quota, clé) : on retombe sur l'appareil si un
+                        // modèle est installé, sinon l'erreur remonte et le journal la garde.
+                        Log.e("VXK", "cloud failed", t)
+                        val local = selectedModelPath() ?: throw t
+                        when {
+                            isParakeetModel(local) && ParakeetEngine.ensure(local) -> ParakeetEngine.transcribe(pcm)
+                            WhisperEngine.ensure(local) -> WhisperEngine.transcribe(pcm, "fr", 4)
+                            else -> throw t
+                        }
+                    }
+                    finalText = expandKeywords(cleanWhisper(raw))
                 }
                 Log.d("VXK", "final model=${model?.substringAfterLast('/')} parakeet=$parakeet ready=$ready pcm=${pcm.size} chars=${finalText.length}")
             } catch (t: Throwable) {

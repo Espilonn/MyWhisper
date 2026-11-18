@@ -19,8 +19,8 @@ android {
         applicationId = "dev.voxkey.bench"
         minSdk = 31
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.1.13"
+        versionCode = 14
+        versionName = "1.1.14"
 
         // On-device benchmarks only; the shipping app never links this.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -63,6 +63,18 @@
     <string name="accent_orange">Orange</string>
     <string name="accent_custom">Personnalisé</string>
 
+    <!-- Moteur de transcription -->
+    <string name="settings_engine">Moteur de transcription</string>
+    <string name="settings_engine_local">Sur l\'appareil</string>
+    <string name="settings_engine_cloud">API cloud</string>
+    <string name="settings_engine_hint">Le mode cloud envoie l\'audio à un service distant : la dictée ne reste plus sur le téléphone. Retour automatique à l\'appareil si le réseau échoue.</string>
+    <string name="settings_cloud_model_hint">Modèle (ex. whisper-large-v3-turbo)</string>
+    <string name="settings_cloud_key_hint">Clé API</string>
+    <string name="settings_cloud_test">Tester la clé</string>
+    <string name="settings_cloud_testing">Vérification…</string>
+    <string name="settings_cloud_test_ok">Clé valide</string>
+    <string name="settings_cloud_test_fail">Échec : %1$s</string>
+
     <!-- Modèle de reconnaissance -->
     <string name="settings_model">Modèle de reconnaissance</string>
     <string name="settings_refresh">Rafraîchir</string>
