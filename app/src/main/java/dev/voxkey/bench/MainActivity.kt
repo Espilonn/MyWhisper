@@ -23,7 +23,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Coquille à 5 onglets : Accueil, Réglages, Mots-clés, Historique, Dictionnaire.
+ * Coquille à 6 onglets : Accueil, Réglages, Mots-clés, Historique, Dictionnaire, Benchmark.
  * Au premier lancement, la mise en place n'est pas finie : on atterrit sur Réglages,
  * qui sert d'écran de bienvenue.
  *
@@ -71,11 +71,15 @@ class MainActivity : Activity() {
         val keywords = KeywordsScreen(this, ui)
         val history = HistoryScreen(this, ui)
         val dictionary = DictionaryScreen(this, ui)
+        val benchmark = BenchmarkScreen(this, ui)
 
         content = FrameLayout(this)
-        screens += listOf(home.view, settings.view, keywords.view, history.view, dictionary.view)
+        screens += listOf(home.view, settings.view, keywords.view, history.view, dictionary.view, benchmark.view)
         screens.forEach { content.addView(it, FrameLayout.LayoutParams(MATCH, MATCH)) }
-        refreshAll += listOf(home::refresh, settings::refresh, keywords::refresh, history::refresh, dictionary::refresh)
+        refreshAll += listOf(
+            home::refresh, settings::refresh, keywords::refresh, history::refresh,
+            dictionary::refresh, benchmark::refresh,
+        )
 
         // Le banc n'est posé que si la préférence le demande : aucune trace au premier lancement.
         settings.onBenchVisibilityChanged = { showBench(it) }
@@ -97,6 +101,7 @@ class MainActivity : Activity() {
             Triple(R.drawable.ic_nav_keywords, getString(R.string.nav_keywords), 2),
             Triple(R.drawable.ic_nav_history, getString(R.string.nav_history), 3),
             Triple(R.drawable.ic_nav_dictionary, getString(R.string.nav_dictionary), 4),
+            Triple(R.drawable.ic_nav_bench, getString(R.string.nav_bench), 5),
         ).forEach { (res, label, index) -> nav.addView(navItem(res, label, index)) }
 
         val bar = LinearLayout(this).apply {
@@ -183,6 +188,11 @@ class MainActivity : Activity() {
         val text = ui.micro(label).apply {
             gravity = Gravity.CENTER
             maxLines = 1
+            // Six onglets : sur un écran de 360 dp, « Dictionnaire » dépasse sa part.
+            // Il se réduit d'un point plutôt que d'être coupé.
+            setAutoSizeTextTypeUniformWithConfiguration(
+                8, 11, 1, android.util.TypedValue.COMPLEX_UNIT_SP,
+            )
         }
         navIcons += icon
         navLabels += text
@@ -193,7 +203,7 @@ class MainActivity : Activity() {
             setPadding(0, ui.dp(6), 0, ui.dp(6))
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             addView(pill)
-            addView(text, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = ui.dp(4) })
+            addView(text, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ui.dp(4) })
             setOnClickListener { select(index) }
         }
     }

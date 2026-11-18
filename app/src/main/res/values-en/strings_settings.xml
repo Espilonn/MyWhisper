@@ -129,6 +129,31 @@
     <string name="nav_keywords">Keywords</string>
     <string name="nav_history">History</string>
     <string name="nav_dictionary">Dictionary</string>
+    <string name="nav_bench">Bench</string>
+
+    <!-- Benchmark tab: the same takes through the local model and the API. -->
+    <string name="bench_tab">Benchmark</string>
+    <string name="bench_tab_sub">Local against API, on three identical takes.</string>
+    <string name="bench_takes">Takes</string>
+    <string name="bench_take">Record take %1$d</string>
+    <string name="bench_redo">Redo take %1$d</string>
+    <string name="bench_take_empty">Empty</string>
+    <string name="bench_take_ready">%1$d s · %2$d samples</string>
+    <string name="bench_take_quiet"> · too quiet</string>
+    <string name="bench_compare_card">Comparison</string>
+    <string name="bench_compare">Compare local and API</string>
+    <string name="bench_need_mic">Microphone denied</string>
+    <string name="bench_recording">Recording take %1$d…</string>
+    <string name="bench_need_audio">Record at least one take.</string>
+    <string name="bench_measuring">Measuring…</string>
+    <string name="bench_done">Done</string>
+    <string name="bench_no_local">Local: no model installed</string>
+    <string name="bench_local_failed">Local: the model could not be loaded</string>
+    <string name="bench_no_key">API: no key saved</string>
+    <string name="bench_take_head">Take %1$d · %2$d s</string>
+    <string name="bench_row_error">%1$s: %2$s</string>
+    <string name="bench_average">average   local %1$d ms · API %2$d ms</string>
+    <string name="bench_verdict">faster: %1$s, by %2$d ms</string>
 
     <!-- Benchmark -->
     <string name="bench_title">Benchmark</string>
